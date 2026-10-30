@@ -1,6 +1,6 @@
 begin;
 
-select plan(20);
+select plan(22);
 
 insert into public.companies (name, slug)
 values ('Acme', 'acme')
@@ -185,10 +185,10 @@ values
     'tok-admin', 'rec-admin', 'new-admin', ''
   );
 
-insert into public.company_members (company_id, user_id, email, role)
+insert into public.company_members (company_id, user_id, email, role, alias)
 values
-  (:'company_id'::uuid, '11111111-1111-4111-8111-111111111111', 'owner@tablero.test', 'owner'),
-  (:'company_id'::uuid, '22222222-2222-4222-8222-222222222222', 'admin@tablero.test', 'admin');
+  (:'company_id'::uuid, '11111111-1111-4111-8111-111111111111', 'owner@tablero.test', 'owner', 'Dueño'),
+  (:'company_id'::uuid, '22222222-2222-4222-8222-222222222222', 'admin@tablero.test', 'admin', 'Admin');
 
 select set_config(
   'request.jwt.claims',
@@ -208,12 +208,28 @@ select is_empty(
   'un admin no cambia roles'
 );
 
+select lives_ok(
+  format(
+    'select public.set_member_alias(%L::uuid, %L::uuid, %L)',
+    :'company_id',
+    '22222222-2222-4222-8222-222222222222',
+    'Ana'
+  ),
+  'un admin guarda su alias'
+);
+
 reset role;
 
 select is(
   (select role from public.company_members where user_id = '22222222-2222-4222-8222-222222222222'),
   'admin',
   'el rol del admin sigue igual'
+);
+
+select is(
+  (select alias from public.company_members where user_id = '22222222-2222-4222-8222-222222222222'),
+  'Ana',
+  'el alias quedó guardado'
 );
 
 select * from finish();

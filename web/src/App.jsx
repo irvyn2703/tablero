@@ -5,7 +5,9 @@ import { Shell } from './components/Shell'
 import { Login } from './pages/Login'
 import { Companies } from './pages/Companies'
 import { Board } from './pages/Board'
+import { NewTicket } from './pages/NewTicket'
 import { Calendar } from './pages/Calendar'
+import { SprintForm } from './pages/SprintForm'
 import { Ticket } from './pages/Ticket'
 import { Statuses } from './pages/Statuses'
 import { Members } from './pages/Members'
@@ -56,7 +58,10 @@ export function App() {
           <Route path="/" element={<Companies />} />
           <Route path="/e/:companyId" element={<Shell />}>
             <Route index element={<Board />} />
+            <Route path="nuevo" element={<NewTicket />} />
             <Route path="calendario" element={<Calendar />} />
+            <Route path="calendario/nuevo" element={<SprintForm />} />
+            <Route path="calendario/s/:sprintId" element={<SprintForm />} />
             <Route path="t/:ticketId" element={<Ticket />} />
             <Route path="estados" element={<Statuses />} />
             <Route path="miembros" element={<Members />} />

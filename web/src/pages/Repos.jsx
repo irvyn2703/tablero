@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { messageFrom } from '../lib/format'
-import { Alert } from '../components/ui'
+import { isAdmin, messageFrom } from '../lib/format'
+import { ActionButton, Alert, Done, useFeedback } from '../components/ui'
 
 export function Repos() {
   const { companyId } = useParams()
@@ -11,6 +11,7 @@ export function Repos() {
   const [name, setName] = useState('')
   const [branch, setBranch] = useState('develop')
   const [error, setError] = useState('')
+  const { busy, done, mark, run } = useFeedback()
 
   async function load() {
     const { data, error: loadError } = await supabase.from('repos').select('id, github_full_name, default_branch').eq('company_id', companyId)
@@ -22,20 +23,23 @@ export function Repos() {
 
   async function add(event) {
     event.preventDefault()
-    setError('')
-    const { error: insertError } = await supabase.from('repos').insert({
-      company_id: companyId,
-      github_full_name: name,
-      default_branch: branch,
-    })
-    if (insertError) setError(messageFrom(insertError))
-    else {
+    await run('add', async () => {
+      setError('')
+      const { error: insertError } = await supabase.from('repos').insert({
+        company_id: companyId,
+        github_full_name: name,
+        default_branch: branch,
+      })
+      if (insertError) {
+        setError(messageFrom(insertError))
+        return false
+      }
       setName('')
       load()
-    }
+    }, 'Repo agregado.')
   }
 
-  if (role === 'dev') return <p className="quiet">Esta sección es de administración.</p>
+  if (!isAdmin(role)) return <p className="quiet">Esta sección es de administración.</p>
 
   return (
     <section className="page">
@@ -61,7 +65,10 @@ export function Repos() {
             <input value={branch} onChange={(event) => setBranch(event.target.value)} required />
           </label>
         </div>
-        <button className="btn" type="submit" style={{ marginTop: '0.8rem' }}>Agregar</button>
+        <ActionButton name="add" busy={busy} pending="Agregando…" className="btn" type="submit" style={{ marginTop: '0.8rem' }}>
+          Agregar
+        </ActionButton>
+        <Done name="add" mark={mark}>{done}</Done>
       </form>
     </section>
   )

@@ -36,7 +36,7 @@ async function call(fn, args) {
 
 server.tool(
   'recommend',
-  'Recomienda qué ticket atender. Si el primero dice ejecutar, puedes tomarlo, resolverlo y abrir el pull. Si dice sugerir, solo proponlo.',
+  'Recomienda qué ticket atender. key es el nombre de la rama, por ejemplo FTCK-1. El ticket puede traer varios repos, cada uno con su rama base. Si el primero dice ejecutar, puedes tomarlo, resolverlo y abrir un pull en cada repo. Si dice sugerir, solo proponlo.',
   {},
   async () => call('agent_recommend', {}),
 )

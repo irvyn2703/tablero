@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { messageFrom } from '../lib/format'
-import { Alert } from '../components/ui'
+import { hexColor, isAdmin, laneVars, messageFrom } from '../lib/format'
+import { ActionButton, Alert, Done, useFeedback } from '../components/ui'
 
 const kinds = [
   ['work', 'Trabajo'],
@@ -11,7 +11,7 @@ const kinds = [
 ]
 
 function blank() {
-  return { key: crypto.randomUUID(), name: '', kind: 'work', weight: 0 }
+  return { key: crypto.randomUUID(), name: '', kind: 'work', weight: 0, color: '#c4a574' }
 }
 
 export function Statuses() {
@@ -21,11 +21,12 @@ export function Statuses() {
   const [remap, setRemap] = useState({})
   const [removed, setRemoved] = useState([])
   const [error, setError] = useState('')
+  const { busy, done, mark, run } = useFeedback()
 
   useEffect(() => {
     supabase
       .from('statuses')
-      .select('id, name, kind, weight, position')
+      .select('id, name, kind, weight, position, color')
       .eq('company_id', companyId)
       .order('position')
       .then(({ data, error: loadError }) => {
@@ -57,32 +58,36 @@ export function Statuses() {
 
   async function save(event) {
     event.preventDefault()
-    setError('')
     if (removed.some((row) => !remap[row.id])) {
       setError('Elige a dónde pasan los tickets de cada estado que quitas.')
       return
     }
-    const payload = rows.map((row) => ({
-      id: row.id ?? null,
-      name: row.name,
-      kind: row.kind,
-      weight: row.kind === 'work' ? Number(row.weight) || 0 : 0,
-    }))
-    const { error: saveError } = await supabase.rpc('set_statuses', {
-      p_company_id: companyId,
-      p_rows: payload,
-      p_remap: remap,
-    })
-    if (saveError) setError(messageFrom(saveError))
-    else {
+    await run('save', async () => {
+      setError('')
+      const payload = rows.map((row) => ({
+        id: row.id ?? null,
+        name: row.name,
+        kind: row.kind,
+        weight: row.kind === 'work' ? Number(row.weight) || 0 : 0,
+        color: hexColor(row.color),
+      }))
+      const { error: saveError } = await supabase.rpc('set_statuses', {
+        p_company_id: companyId,
+        p_rows: payload,
+        p_remap: remap,
+      })
+      if (saveError) {
+        setError(messageFrom(saveError))
+        return false
+      }
       setRemoved([])
       setRemap({})
-      const { data } = await supabase.from('statuses').select('id, name, kind, weight, position').eq('company_id', companyId).order('position')
+      const { data } = await supabase.from('statuses').select('id, name, kind, weight, position, color').eq('company_id', companyId).order('position')
       setRows((data ?? []).map((row) => ({ ...row, key: row.id })))
-    }
+    }, 'Flujo guardado.')
   }
 
-  if (role === 'dev') return <p className="quiet">Esta sección es de administración.</p>
+  if (!isAdmin(role)) return <p className="quiet">Esta sección es de administración.</p>
 
   return (
     <section className="page">
@@ -97,7 +102,7 @@ export function Statuses() {
       <form onSubmit={save}>
         <div className="list">
           {rows.map((row, index) => (
-            <div className="status-row" key={row.key}>
+            <div className="status-row" key={row.key} style={laneVars(row.color)}>
               <div className="cluster">
                 <button className="btn quiet" type="button" onClick={() => move(index, -1)} aria-label="Subir">↑</button>
                 <button className="btn quiet" type="button" onClick={() => move(index, 1)} aria-label="Bajar">↓</button>
@@ -123,6 +128,16 @@ export function Statuses() {
                   onChange={(event) => update(row.key, { weight: event.target.value })}
                 />
               </label>
+              <label className="field">
+                <span>Color</span>
+                <input
+                  className="color-input"
+                  type="color"
+                  value={hexColor(row.color)}
+                  aria-label={`Color de ${row.name || 'estado'}`}
+                  onChange={(event) => update(row.key, { color: event.target.value })}
+                />
+              </label>
               <button className="btn danger" type="button" onClick={() => remove(index)}>Quitar</button>
             </div>
           ))}
@@ -140,8 +155,11 @@ export function Statuses() {
         ))}
         <div className="cluster" style={{ marginTop: '1rem' }}>
           <button className="btn quiet" type="button" onClick={() => setRows((current) => [...current, blank()])}>Agregar estado</button>
-          <button className="btn" type="submit">Guardar flujo</button>
+          <ActionButton name="save" busy={busy} pending="Guardando…" className="btn" type="submit">
+            Guardar flujo
+          </ActionButton>
         </div>
+        <Done name="save" mark={mark}>{done}</Done>
       </form>
     </section>
   )

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Alert } from './ui'
+import { isAdmin } from '../lib/format'
+import { ActionButton, Alert, useFeedback } from './ui'
 
 const links = [
   ['', 'Tablero'],
@@ -23,12 +24,13 @@ export function Shell() {
   const [company, setCompany] = useState(null)
   const [role, setRole] = useState('')
   const [error, setError] = useState('')
+  const { busy, run } = useFeedback()
 
   useEffect(() => {
     let alive = true
     supabase
       .from('company_members')
-      .select('role, companies(id, name, slug, policy)')
+      .select('role, companies(id, name, slug, policy, ticket_prefix)')
       .eq('company_id', companyId)
       .eq('user_id', session.user.id)
       .maybeSingle()
@@ -44,9 +46,11 @@ export function Shell() {
     return () => { alive = false }
   }, [companyId, session.user.id])
 
-  async function signOut() {
-    await supabase.auth.signOut()
-    navigate('/entrar')
+  function signOut() {
+    return run('leave', async () => {
+      await supabase.auth.signOut()
+      navigate('/entrar')
+    })
   }
 
   if (error) {
@@ -56,7 +60,7 @@ export function Shell() {
     return <main className="main"><p className="quiet">Un momento.</p></main>
   }
 
-  const items = role === 'dev' ? links : [...links, ...adminLinks]
+  const items = isAdmin(role) ? [...links, ...adminLinks] : links
 
   return (
     <div className="shell">
@@ -80,10 +84,12 @@ export function Shell() {
             </NavLink>
           ))}
         </nav>
-        <button className="btn quiet" type="button" onClick={signOut}>Salir</button>
+        <ActionButton name="leave" busy={busy} pending="Saliendo…" className="btn quiet" type="button" onClick={signOut}>
+          Salir
+        </ActionButton>
       </aside>
       <div className="main">
-        <Outlet context={{ session, company, role }} />
+        <Outlet context={{ session, company, role, patchCompany: (partial) => setCompany((current) => ({ ...current, ...partial })) }} />
       </div>
     </div>
   )

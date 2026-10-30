@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { messageFrom } from '../lib/format'
-import { Alert } from '../components/ui'
+import { messageFrom, roleLabel } from '../lib/format'
+import { ActionButton, Alert, useFeedback } from '../components/ui'
 
 export function Companies() {
   const { session } = useOutletContext()
@@ -11,6 +11,7 @@ export function Companies() {
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [error, setError] = useState('')
+  const { busy, run } = useFeedback()
 
   async function load() {
     const { data, error: loadError } = await supabase
@@ -25,21 +26,25 @@ export function Companies() {
 
   async function createCompany(event) {
     event.preventDefault()
-    setError('')
-    const { data, error: createError } = await supabase.rpc('create_company', {
-      p_name: name,
-      p_slug: slug,
+    await run('create', async () => {
+      setError('')
+      const { data, error: createError } = await supabase.rpc('create_company', {
+        p_name: name,
+        p_slug: slug,
+      })
+      if (createError) {
+        setError(messageFrom(createError))
+        return false
+      }
+      navigate(`/e/${data}`)
     })
-    if (createError) {
-      setError(messageFrom(createError))
-      return
-    }
-    navigate(`/e/${data}`)
   }
 
-  async function signOut() {
-    await supabase.auth.signOut()
-    navigate('/entrar')
+  function signOut() {
+    return run('leave', async () => {
+      await supabase.auth.signOut()
+      navigate('/entrar')
+    })
   }
 
   return (
@@ -49,14 +54,16 @@ export function Companies() {
           <p className="kicker">Empresas</p>
           <h1>Tus mesas de trabajo.</h1>
         </div>
-        <button className="btn quiet" type="button" onClick={signOut}>Salir</button>
+        <ActionButton name="leave" busy={busy} pending="Saliendo…" className="btn quiet" type="button" onClick={signOut}>
+          Salir
+        </ActionButton>
       </div>
       <Alert>{error}</Alert>
       <div className="companies">
         {rows.map((row) => (
           <Link key={row.companies.id} className="company-card" to={`/e/${row.companies.id}`}>
             <strong>{row.companies.name}</strong>
-            <span className="quiet">{row.role === 'owner' ? 'Dueño' : row.role === 'admin' ? 'Admin' : 'Dev'}</span>
+            <span className="quiet">{roleLabel[row.role]}</span>
           </Link>
         ))}
       </div>
@@ -77,7 +84,9 @@ export function Companies() {
             />
           </label>
         </div>
-        <button className="btn" type="submit" style={{ marginTop: '0.8rem' }}>Crear</button>
+        <ActionButton name="create" busy={busy} pending="Creando…" className="btn" type="submit" style={{ marginTop: '0.8rem' }}>
+          Crear
+        </ActionButton>
       </form>
     </main>
   )

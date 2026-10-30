@@ -26,7 +26,7 @@ export function Track() {
       <Alert>{error}</Alert>
       {ticket && (
         <>
-          <p className="quiet">#{ticket.number} · {ticket.status}</p>
+          <p className="quiet">{ticket.key || `#${ticket.number}`} · {ticket.status}</p>
           <Progress value={ticket.progress} />
           <ol className="timeline">
             {ticket.events.map((event) => (
