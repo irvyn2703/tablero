@@ -1,0 +1,133 @@
+.ledger { min-width: 0; }
+
+.calendar-week { margin-bottom: 1rem; }
+
+.days, .bar-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+
+.day {
+  min-height: 2.4rem;
+  padding: 0.25rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.82rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+}
+
+.day .closed {
+  color: var(--brass);
+  font-size: 0.72rem;
+  line-height: 1.25;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.day.out { opacity: 0.35; }
+
+.bar-row { margin-top: 0.15rem; }
+
+.bar {
+  background: var(--pine-soft);
+  color: var(--pine);
+  border-left: 2px solid var(--brass);
+  padding: 0.35rem 0.5rem 0.45rem;
+  font-size: 0.78rem;
+}
+
+.bar.slim {
+  padding: 0.12rem 0.5rem;
+}
+
+.bar-name,
+.bar-detail { display: none; }
+
+.bar.slim .bar-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar .cluster { gap: 0.45rem; }
+
+.text-btn,
+.bar a.text-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--brass);
+  font-size: 0.72rem;
+  text-decoration: underline;
+  text-underline-offset: 0.15rem;
+}
+
+.bar ul {
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+  max-width: 100%;
+}
+
+.bar a {
+  color: inherit;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.bar li + li { margin-top: 0.35rem; }
+
+.bar li > .quiet { display: block; }
+
+.bar .meter {
+  max-width: 9rem;
+  margin-top: 0.15rem;
+}
+
+@media (max-width: 860px) {
+  .ledger { overflow: visible; }
+  .ledger > .days > span {
+    text-align: center;
+    font-size: 0.68rem;
+    white-space: nowrap;
+  }
+  .day {
+    align-items: center;
+    min-width: 0;
+    padding: 0.15rem 0;
+    text-align: center;
+  }
+  .day .closed { width: 100%; text-align: center; }
+  .closed-title { display: none; }
+  .bar { min-width: 0; padding: 0.2rem 0.3rem; }
+  .bar-inline { display: none; }
+  .bar-name {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bar-detail {
+    display: block;
+    grid-column: 1 / -1;
+    margin-top: 0.2rem;
+    padding: 0.55rem 0.7rem 0.7rem;
+    background: var(--pine-soft);
+    color: var(--pine);
+    border-left: 2px solid var(--brass);
+  }
+  .bar-detail ul {
+    margin: 0.35rem 0 0;
+    padding: 0;
+    list-style: none;
+    max-width: none;
+  }
+  .bar-detail li + li { margin-top: 0.35rem; }
+  .bar-detail li > .quiet { display: block; }
+  .bar-detail a { overflow-wrap: anywhere; }
+}

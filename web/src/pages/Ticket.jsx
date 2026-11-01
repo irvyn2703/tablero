@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Link, useOutletContext, useParams } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { autonomyLabel, canEdit, estimateLabel, formatWhen, memberName, messageFrom, priorityLabel, ticketKey } from '../lib/format'
-import { openTicketFile, takeFiles, uploadTicketFiles } from '../lib/files'
+import { discardTicket, openTicketFile, takeFiles, uploadTicketFiles } from '../lib/files'
 import { FilePicker, SavedFiles } from '../components/Files'
-import { ActionButton, Alert, Done, Progress, useFeedback } from '../components/ui'
+import { Thread } from '../components/Thread'
+import { ActionButton, Alert, Done, Progress, TicketChips, useFeedback } from '../components/ui'
 
 export function Ticket() {
+  const navigate = useNavigate()
   const { companyId, ticketId } = useParams()
   const { company, role } = useOutletContext()
   const editable = canEdit(role)
@@ -17,6 +19,7 @@ export function Ticket() {
   const [repos, setRepos] = useState([])
   const [chosenRepos, setChosenRepos] = useState([])
   const [events, setEvents] = useState([])
+  const [messages, setMessages] = useState([])
   const [pulls, setPulls] = useState([])
   const [savedFiles, setSavedFiles] = useState([])
   const [picked, setPicked] = useState([])
@@ -24,18 +27,19 @@ export function Ticket() {
   const { busy, done, mark, run } = useFeedback()
 
   async function load() {
-    const [ticketRes, statusRes, memberRes, sprintRes, repoRes, linkRes, eventRes, pullRes, fileRes] = await Promise.all([
+    const [ticketRes, statusRes, memberRes, sprintRes, repoRes, linkRes, eventRes, messageRes, pullRes, fileRes] = await Promise.all([
       supabase.from('ticket_rows').select('*').eq('id', ticketId).maybeSingle(),
-      supabase.from('statuses').select('id, name').eq('company_id', companyId).order('position'),
+      supabase.from('statuses').select('id, name, allows_delete').eq('company_id', companyId).order('position'),
       supabase.from('company_members').select('user_id, alias').eq('company_id', companyId),
       supabase.from('sprints').select('id, name').eq('company_id', companyId).order('starts_on'),
       supabase.from('repos').select('id, github_full_name, default_branch').eq('company_id', companyId),
       supabase.from('ticket_repos').select('repo_id').eq('ticket_id', ticketId),
       supabase.from('ticket_events').select('id, body, visibility, created_at').eq('ticket_id', ticketId).order('created_at'),
+      supabase.from('ticket_messages').select('id, side, author_label, body, created_at').eq('ticket_id', ticketId).order('created_at'),
       supabase.from('pull_requests').select('id, url, created_at').eq('ticket_id', ticketId).order('created_at'),
       supabase.from('ticket_files').select('id, name, mime, byte_size, object_path, created_at').eq('ticket_id', ticketId).order('created_at'),
     ])
-    const failed = [ticketRes, statusRes, memberRes, sprintRes, repoRes, linkRes, eventRes, pullRes, fileRes].find((item) => item.error)
+    const failed = [ticketRes, statusRes, memberRes, sprintRes, repoRes, linkRes, eventRes, messageRes, pullRes, fileRes].find((item) => item.error)
     if (failed) {
       setError(messageFrom(failed.error))
       return
@@ -47,11 +51,47 @@ export function Ticket() {
     setRepos(repoRes.data ?? [])
     setChosenRepos((linkRes.data ?? []).map((link) => link.repo_id))
     setEvents(eventRes.data ?? [])
+    setMessages((messageRes.data ?? []).map((message) => ({
+      id: message.id,
+      side: message.side,
+      name: message.author_label,
+      body: message.body,
+      at: message.created_at,
+    })))
     setPulls(pullRes.data ?? [])
     setSavedFiles(fileRes.data ?? [])
   }
 
   useEffect(() => { load() }, [ticketId, companyId])
+
+  function discard() {
+    const key = ticketKey(company.ticket_prefix, ticket.public_number)
+    return run('delete', async () => {
+      setError('')
+      const result = await discardTicket(ticketId, key)
+      if (result.cancelled) return false
+      if (result.error) {
+        setError(messageFrom(result.error))
+        return false
+      }
+      navigate(`/e/${companyId}`)
+    }, 'Ticket eliminado.')
+  }
+
+  function sendMessage(body) {
+    return run('message', async () => {
+      setError('')
+      const { error: sendError } = await supabase.rpc('post_ticket_message', {
+        p_ticket_id: ticketId,
+        p_body: body,
+      })
+      if (sendError) {
+        setError(messageFrom(sendError))
+        return false
+      }
+      load()
+    }, 'Mensaje enviado.')
+  }
 
   function patch(partial) {
     setTicket((current) => ({ ...current, ...partial }))
@@ -123,7 +163,13 @@ export function Ticket() {
       <p className="kicker"><Link to={`/e/${companyId}`}>{company.name}</Link></p>
       <div className="row">
         <h1>{ticketKey(company.ticket_prefix, ticket.public_number)} {ticket.title}</h1>
+        {editable && statuses.some((status) => status.id === ticket.status_id && status.allows_delete) && (
+          <button className="btn danger" type="button" disabled={Boolean(busy)} onClick={discard}>
+            Eliminar
+          </button>
+        )}
       </div>
+      <TicketChips priority={ticket.priority} estimate={ticket.estimate} />
       <Progress value={ticket.progress} />
       <Alert>{error}</Alert>
       <form onSubmit={saveFields} className="panel" style={{ marginTop: '1rem' }}>
@@ -283,6 +329,16 @@ export function Ticket() {
         )}
         <Done name="progress" mark={mark}>{done}</Done>
       </form>
+      <Thread
+        messages={messages}
+        canWrite={editable}
+        reporterLabel="Reporte"
+        statusName={statuses.find((status) => status.id === ticket.status_id)?.name}
+        busy={busy}
+        mark={mark}
+        done={done}
+        onSend={sendMessage}
+      />
       {pulls.length > 0 && (
         <section style={{ marginTop: '1.4rem' }}>
           <h2>Pulls</h2>

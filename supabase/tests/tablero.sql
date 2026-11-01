@@ -1,6 +1,6 @@
 begin;
 
-select plan(24);
+select plan(25);
 
 insert into public.companies (name, slug)
 values ('Acme', 'acme')
@@ -230,6 +230,22 @@ select is(
   (select alias from public.company_members where user_id = '22222222-2222-4222-8222-222222222222'),
   'Ana',
   'el alias quedó guardado'
+);
+
+insert into public.tickets (company_id, public_number, title, status_id, view_token_hash)
+values (
+  :'company_id'::uuid,
+  2,
+  'Llega después',
+  (select id from public.statuses where company_id = :'company_id' and name = 'Recibido'),
+  repeat('cd', 32)
+)
+returning id as later_id \gset
+
+select ok(
+  (select rank from public.tickets where id = :'later_id'::uuid)
+    < (select rank from public.tickets where id = :'ticket_id'::uuid),
+  'un ticket nuevo queda delante'
 );
 
 select is(private.file_mime('foto.PNG'), 'image/png', 'una imagen png');

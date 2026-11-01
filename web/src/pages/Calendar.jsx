@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { canEdit, memberName, messageFrom, ticketKey } from '../lib/format'
-import { Alert, Progress } from '../components/ui'
+import { Alert, Progress, TicketChips } from '../components/ui'
 
 const weekday = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
@@ -70,7 +70,7 @@ export function Calendar() {
   async function load() {
     const [sprintRes, ticketRes, eventRes, memberRes] = await Promise.all([
       supabase.from('sprints').select('id, name, starts_on, ends_on').eq('company_id', companyId).order('starts_on'),
-      supabase.from('ticket_rows').select('id, public_number, title, sprint_id, status_kind, progress, assignee_id').eq('company_id', companyId).order('public_number'),
+      supabase.from('ticket_rows').select('id, public_number, title, sprint_id, status_kind, progress, assignee_id, priority, estimate, rank').eq('company_id', companyId).order('rank'),
       supabase.from('ticket_events').select('ticket_id, body, created_at').eq('company_id', companyId).order('created_at'),
       supabase.from('company_members').select('user_id, alias').eq('company_id', companyId),
     ])
@@ -148,7 +148,8 @@ export function Calendar() {
                   <span>{day.getDate()}</span>
                   {(closedByDay.get(key) ?? []).map((ticket) => (
                     <Link key={ticket.id} className="closed" to={`../t/${ticket.id}`}>
-                      {ticketKey(company.ticket_prefix, ticket.public_number)} {ticket.title}
+                      <span className="closed-key">{ticketKey(company.ticket_prefix, ticket.public_number)}</span>
+                      <span className="closed-title"> {ticket.title}</span>
                     </Link>
                   ))}
                 </div>
@@ -173,30 +174,36 @@ export function Calendar() {
               return sprint.starts_on <= end && sprint.ends_on >= start
             })
             const showTickets = firstWeek && keyOf(firstWeek[0]) === keyOf(days[0])
+            const detail = (
+              <>
+                <div className="cluster">
+                  <strong>{sprint.name}</strong>
+                  {editable && <Link className="text-btn" to={`s/${sprint.id}`}>Editar</Link>}
+                </div>
+                {carried.length === 0
+                  ? <div className="quiet">Sin tickets. Asígnale este sprint en la ficha.</div>
+                  : (
+                    <ul>
+                      {carried.map((ticket) => (
+                        <li key={ticket.id}>
+                          <Link to={`../t/${ticket.id}`}>{ticketKey(company.ticket_prefix, ticket.public_number)} {ticket.title}</Link>
+                          <TicketChips priority={ticket.priority} estimate={ticket.estimate} />
+                          {finished(ticket)
+                            ? <span className="quiet">Completo · {assigneeOf(ticket)}</span>
+                            : <Progress value={ticket.progress} />}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+              </>
+            )
             return (
               <div className="bar-row" key={sprint.id}>
                 <div className={showTickets ? 'bar' : 'bar slim'} style={{ gridColumn: `${from + 1} / ${to + 2}` }}>
-                  <div className="cluster">
-                    <strong>{sprint.name}</strong>
-                    {showTickets && editable && <Link className="text-btn" to={`s/${sprint.id}`}>Editar</Link>}
-                  </div>
-                  {showTickets && (
-                    carried.length === 0
-                      ? <div className="quiet">Sin tickets. Asígnale este sprint en la ficha.</div>
-                      : (
-                        <ul>
-                          {carried.map((ticket) => (
-                            <li key={ticket.id}>
-                              <Link to={`../t/${ticket.id}`}>{ticketKey(company.ticket_prefix, ticket.public_number)} {ticket.title}</Link>
-                              {finished(ticket)
-                                ? <span className="quiet">Completo · {assigneeOf(ticket)}</span>
-                                : <Progress value={ticket.progress} />}
-                            </li>
-                          ))}
-                        </ul>
-                      )
-                  )}
+                  <strong className="bar-name">{sprint.name}</strong>
+                  {showTickets && <div className="bar-inline">{detail}</div>}
                 </div>
+                {showTickets && <div className="bar-detail">{detail}</div>}
               </div>
             )
           })}

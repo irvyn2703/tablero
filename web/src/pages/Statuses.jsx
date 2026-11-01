@@ -11,7 +11,7 @@ const kinds = [
 ]
 
 function blank() {
-  return { key: crypto.randomUUID(), name: '', kind: 'work', weight: 0, color: '#c4a574' }
+  return { key: crypto.randomUUID(), name: '', kind: 'work', weight: 0, color: '#c4a574', allows_delete: false }
 }
 
 export function Statuses() {
@@ -26,7 +26,7 @@ export function Statuses() {
   useEffect(() => {
     supabase
       .from('statuses')
-      .select('id, name, kind, weight, position, color')
+      .select('id, name, kind, weight, position, color, allows_delete')
       .eq('company_id', companyId)
       .order('position')
       .then(({ data, error: loadError }) => {
@@ -70,6 +70,7 @@ export function Statuses() {
         kind: row.kind,
         weight: row.kind === 'work' ? Number(row.weight) || 0 : 0,
         color: hexColor(row.color),
+        allows_delete: Boolean(row.allows_delete),
       }))
       const { error: saveError } = await supabase.rpc('set_statuses', {
         p_company_id: companyId,
@@ -82,7 +83,7 @@ export function Statuses() {
       }
       setRemoved([])
       setRemap({})
-      const { data } = await supabase.from('statuses').select('id, name, kind, weight, position, color').eq('company_id', companyId).order('position')
+      const { data } = await supabase.from('statuses').select('id, name, kind, weight, position, color, allows_delete').eq('company_id', companyId).order('position')
       setRows((data ?? []).map((row) => ({ ...row, key: row.id })))
     }, 'Flujo guardado.')
   }
@@ -136,6 +137,16 @@ export function Statuses() {
                   value={hexColor(row.color)}
                   aria-label={`Color de ${row.name || 'estado'}`}
                   onChange={(event) => update(row.key, { color: event.target.value })}
+                />
+              </label>
+              <label className="switch">
+                <span>Permitir borrar</span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={Boolean(row.allows_delete)}
+                  aria-label={`Permitir borrar tickets en ${row.name || 'este estado'}`}
+                  onChange={(event) => update(row.key, { allows_delete: event.target.checked })}
                 />
               </label>
               <button className="btn danger" type="button" onClick={() => remove(index)}>Quitar</button>

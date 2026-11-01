@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { formatProgress, ticketKinds } from '../lib/format'
+import { estimateLabel, formatProgress, priorityLabel, ticketKinds } from '../lib/format'
 
 export function Progress({ value }) {
   const n = Math.max(0, Math.min(100, Number(value) || 0))
@@ -9,6 +9,17 @@ export function Progress({ value }) {
       <b><i style={{ width: `${n}%` }} /></b>
       <span>{label}%</span>
     </div>
+  )
+}
+
+export function TicketChips({ priority, estimate }) {
+  const level = Number(priority) || 3
+  const tone = level === 1 ? 'is-urgent' : level === 2 ? 'is-high' : level === 4 ? 'is-low' : ''
+  return (
+    <span className="chips">
+      <span className={tone ? `chip ${tone}` : 'chip'}>{priorityLabel[level] || 'Normal'}</span>
+      <span className="chip">{estimateLabel[estimate] || 'Mediano'}</span>
+    </span>
   )
 }
 
@@ -96,7 +107,7 @@ export function useFeedback() {
   useEffect(() => () => window.clearTimeout(timer.current), [])
 
   async function run(name, work, message) {
-    if (lock.current) return
+    if (lock.current) return false
     lock.current = true
     setBusy(name)
     setDone('')
@@ -117,6 +128,7 @@ export function useFeedback() {
         setMark('')
       }, 3200)
     }
+    return ok
   }
 
   return { busy, done, mark, run }

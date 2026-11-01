@@ -151,7 +151,7 @@ export function Intake() {
             onRemove={(index) => setFiles((current) => current.filter((_, item) => item !== index))}
           />
           <label className="field" style={{ marginTop: '0.8rem' }}>
-            <span>Correo, si quieres aviso</span>
+            <span>Correo, para contactarte</span>
             <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
           </label>
           <ActionButton name="send" busy={busy} pending="Enviando…" className="btn" type="submit" style={{ marginTop: '1rem' }}>

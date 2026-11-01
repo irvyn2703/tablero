@@ -70,6 +70,30 @@ export async function uploadTicketFiles({ ticketId, viewToken, files }) {
   return failed
 }
 
+const filesLeft = new Map()
+
+export async function discardTicket(ticketId, label) {
+  if (!filesLeft.has(ticketId)) {
+    if (!window.confirm(`Se elimina ${label}. Ese número no se vuelve a usar.`)) return { cancelled: true }
+    const { data, error } = await supabase.rpc('delete_ticket', { p_ticket_id: ticketId })
+    if (error) return { error }
+    filesLeft.set(ticketId, data ?? [])
+  }
+  const removed = await removeStoredFiles(filesLeft.get(ticketId))
+  if (removed.error) {
+    return { error: { message: 'El ticket ya no está. Sus archivos no se pudieron quitar. Inténtalo otra vez.' } }
+  }
+  filesLeft.delete(ticketId)
+  return {}
+}
+
+export async function removeStoredFiles(paths) {
+  const list = (paths ?? []).filter(Boolean)
+  if (!list.length) return { error: null }
+  const removed = await supabase.storage.from('ticket-files').remove(list)
+  return { error: removed.error || null }
+}
+
 export async function openTicketFile(file) {
   const image = String(file.mime || '').startsWith('image/')
   const { data, error } = await supabase.storage.from('ticket-files').createSignedUrl(
