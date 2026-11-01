@@ -31,6 +31,6 @@ Settings → Pages → Source: GitHub Actions.
 
 ## MCP
 
-Crea el token en Automatización. La pantalla muestra la config para Cursor: la URL del endpoint y el token. El agente lee el estado inicial, guarda prioridad, tamaño y autonomía, y abre el pull solo si la política lo permite.
+Crea el token en Automatización. La pantalla muestra la config para Cursor: la URL del endpoint y el token. El agente lee el estado inicial, marca los repos, guarda prioridad, tamaño y autonomía, y abre el pull solo si la política lo permite.
 
-Tools: `inbox`, `suggest`, `claim`, `report_progress`, `attach_pr`, `release`, `recommend`.
+Tools: `inbox`, `assign_repos`, `suggest`, `claim`, `report_progress`, `attach_pr`, `release`, `recommend`.

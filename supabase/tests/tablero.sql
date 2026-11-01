@@ -1,6 +1,6 @@
 begin;
 
-select plan(28);
+select plan(35);
 
 insert into public.companies (name, slug)
 values ('Acme', 'acme')
@@ -253,9 +253,80 @@ set body = E'Tipo\nRequerimiento\n\nQué quieres que se pueda hacer\nVer el sald
 where id = :'later_id'::uuid;
 
 select is(
-  (public.agent_inbox('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa') -> 0 ->> 'type'),
+  (public.agent_inbox('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa') -> 'tickets' -> 0 ->> 'type'),
   'Requerimiento',
   'el estado inicial trae el tipo'
+);
+
+insert into public.repos (company_id, github_full_name, default_branch)
+values
+  (:'company_id'::uuid, 'Finloopmx/Frontend', 'develop'),
+  (:'company_id'::uuid, 'Finloopmx/FinloopBackendCleanCode', 'develop');
+
+select is(
+  jsonb_array_length(public.agent_inbox('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa') -> 'catalog'),
+  2,
+  'el estado inicial trae el catálogo'
+);
+
+select is(
+  jsonb_array_length(
+    public.agent_assign_repos(
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      :'later_id'::uuid,
+      array['Finloopmx/Frontend', 'Finloopmx/FinloopBackendCleanCode']
+    ) -> 'repos'
+  ),
+  2,
+  'el agente marca los dos repos'
+);
+
+select is(
+  jsonb_array_length(
+    public.agent_assign_repos(
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      :'later_id'::uuid,
+      array['Finloopmx/Frontend']
+    ) -> 'repos'
+  ),
+  1,
+  'una segunda marca sustituye a la anterior'
+);
+
+select throws_ok(
+  format(
+    $sql$select public.agent_assign_repos('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', %L::uuid, null)$sql$,
+    :'later_id'
+  ),
+  'P0001',
+  'indica los repos'
+);
+
+select throws_ok(
+  format(
+    $sql$select public.agent_assign_repos('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', %L::uuid, array['Finloopmx/Frontend'])$sql$,
+    :'ticket_id'
+  ),
+  'P0001',
+  'el ticket ya no está en el estado inicial'
+);
+
+select throws_ok(
+  format(
+    $sql$select public.agent_assign_repos('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', %L::uuid, array['otra/cosa'])$sql$,
+    :'later_id'
+  ),
+  'P0001',
+  'repo no encontrado'
+);
+
+select throws_ok(
+  format(
+    $sql$select public.agent_assign_repos('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', %L::uuid, array[' '])$sql$,
+    :'later_id'
+  ),
+  'P0001',
+  'repo no encontrado'
 );
 
 select throws_ok(

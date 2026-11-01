@@ -1,7 +1,8 @@
 const protocol = '2025-03-26'
 
 const instructions = [
-  'Lee el estado inicial con inbox. Cada ticket trae type Ticket o Requerimiento, el reporte en body y los repos.',
+  'Lee el estado inicial con inbox. catalog son los repos de la empresa. Cada ticket trae type Ticket o Requerimiento, el reporte en body y los repos ya marcados.',
+  'Marca los repos que correspondan con assign_repos, usando los nombres de catalog, antes de sugerir.',
   'Comprueba en el repo si el error existe, o si el requerimiento ya está resuelto.',
   'Guarda la sugerencia con suggest: priority 1 urgente a 4 baja, estimate xs, s, m o l, y autonomy suggest, pull o human.',
   'Si next es abrir pull, reserva con claim, abre la rama con la clave del ticket, crea el pull y regístralo con attach_pr. No lo mezcles.',
@@ -11,8 +12,21 @@ const instructions = [
 const tools = [
   {
     name: 'inbox',
-    description: 'Lee los tickets del estado inicial de trabajo, el primero del flujo. Incluye el reporte, si es Ticket o Requerimiento, los repos y los nombres de archivos.',
+    description: 'Lee los tickets del estado inicial y el catálogo de repos de la empresa. catalog son los que se pueden marcar. tickets trae el reporte, si es Ticket o Requerimiento, los repos ya marcados y los nombres de archivos.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'assign_repos',
+    description: 'Marca los repos de un ticket que sigue en el estado inicial. repos son nombres de catalog, por ejemplo Finloopmx/Frontend. Una lista vacía los quita. Sustituye los que ya tenía.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticket_id: { type: 'string', format: 'uuid' },
+        repos: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['ticket_id', 'repos'],
+      additionalProperties: false,
+    },
   },
   {
     name: 'suggest',
@@ -146,6 +160,13 @@ async function callRpc(name, args) {
 function argumentsFor(name, token, args) {
   if (name === 'inbox') return ['agent_inbox', { p_token: token }]
   if (name === 'recommend') return ['agent_recommend', { p_token: token }]
+  if (name === 'assign_repos') {
+    return ['agent_assign_repos', {
+      p_token: token,
+      p_ticket_id: args.ticket_id,
+      p_repos: args.repos ?? null,
+    }]
+  }
   if (name === 'suggest') {
     return ['agent_suggest', {
       p_token: token,

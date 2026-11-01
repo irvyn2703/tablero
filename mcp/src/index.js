@@ -36,9 +36,22 @@ async function call(fn, args) {
 
 server.tool(
   'inbox',
-  'Lee los tickets del estado inicial de trabajo, el primero del flujo. Incluye el reporte, si es Ticket o Requerimiento, los repos y los nombres de archivos.',
+  'Lee los tickets del estado inicial y el catálogo de repos de la empresa. catalog son los que se pueden marcar. tickets trae el reporte, si es Ticket o Requerimiento, los repos ya marcados y los nombres de archivos.',
   {},
   async () => call('agent_inbox', {}),
+)
+
+server.tool(
+  'assign_repos',
+  'Marca los repos de un ticket que sigue en el estado inicial. repos son nombres de catalog, por ejemplo Finloopmx/Frontend. Una lista vacía los quita. Sustituye los que ya tenía.',
+  {
+    ticket_id: z.string().uuid(),
+    repos: z.array(z.string()),
+  },
+  async ({ ticket_id, repos }) => call('agent_assign_repos', {
+    p_ticket_id: ticket_id,
+    p_repos: repos,
+  }),
 )
 
 server.tool(
