@@ -1,6 +1,6 @@
 begin;
 
-select plan(25);
+select plan(28);
 
 insert into public.companies (name, slug)
 values ('Acme', 'acme')
@@ -246,6 +246,31 @@ select ok(
   (select rank from public.tickets where id = :'later_id'::uuid)
     < (select rank from public.tickets where id = :'ticket_id'::uuid),
   'un ticket nuevo queda delante'
+);
+
+update public.tickets
+set body = E'Tipo\nRequerimiento\n\nQué quieres que se pueda hacer\nVer el saldo'
+where id = :'later_id'::uuid;
+
+select is(
+  (public.agent_inbox('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa') -> 0 ->> 'type'),
+  'Requerimiento',
+  'el estado inicial trae el tipo'
+);
+
+select throws_ok(
+  format(
+    $sql$select public.agent_suggest('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', %L::uuid, 2, 's', 'pull', null)$sql$,
+    :'ticket_id'
+  ),
+  'P0001',
+  'el ticket ya no está en el estado inicial'
+);
+
+select is(
+  (public.agent_suggest('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', :'later_id'::uuid, 2, 's', 'pull', 'Se puede en el listado') ->> 'next'),
+  'solo sugerir',
+  'sin la política no abre el pull'
 );
 
 select is(private.file_mime('foto.PNG'), 'image/png', 'una imagen png');

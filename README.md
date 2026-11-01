@@ -1,6 +1,6 @@
 # Tablero
 
-Empresas, tickets con avance y sprints. El front es estático. Supabase guarda los datos. Un agente local recomienda, reserva y adjunta el pull; no lo mergea.
+Empresas, tickets con avance y sprints. El front es estático. Supabase guarda los datos. El agente se conecta al endpoint, lee el estado inicial y adjunta el pull; no lo mergea.
 
 ## Web
 
@@ -31,18 +31,6 @@ Settings → Pages → Source: GitHub Actions.
 
 ## MCP
 
-Crea el token en Automatización. En la config del agente:
+Crea el token en Automatización. La pantalla muestra la config para Cursor: la URL del endpoint y el token. El agente lee el estado inicial, guarda prioridad, tamaño y autonomía, y abre el pull solo si la política lo permite.
 
-```json
-"tablero": {
-  "command": "node",
-  "args": ["ruta/a/tablero/mcp/src/index.js"],
-  "env": {
-    "SUPABASE_URL": "https://<proyecto>.supabase.co",
-    "SUPABASE_ANON_KEY": "<anon>",
-    "TABLERO_TOKEN": "<token>"
-  }
-}
-```
-
-Tools: `recommend`, `claim`, `report_progress`, `attach_pr`, `release`.
+Tools: `inbox`, `suggest`, `claim`, `report_progress`, `attach_pr`, `release`, `recommend`.

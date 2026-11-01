@@ -100,13 +100,13 @@ export function Automation() {
       <Secret label="Token del agente" value={secret} />
       {secret && (
         <pre className="note secret">{`{
-  "tablero": {
-    "command": "node",
-    "args": ["ruta/a/tablero/mcp/src/index.js"],
-    "env": {
-      "SUPABASE_URL": "…",
-      "SUPABASE_ANON_KEY": "…",
-      "TABLERO_TOKEN": "${secret}"
+  "mcpServers": {
+    "tablero": {
+      "url": "${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mcp",
+      "headers": {
+        "Authorization": "Bearer ${secret}",
+        "apikey": "${import.meta.env.VITE_SUPABASE_ANON_KEY}"
+      }
     }
   }
 }`}</pre>

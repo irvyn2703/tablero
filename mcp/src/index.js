@@ -35,8 +35,34 @@ async function call(fn, args) {
 }
 
 server.tool(
+  'inbox',
+  'Lee los tickets del estado inicial de trabajo, el primero del flujo. Incluye el reporte, si es Ticket o Requerimiento, los repos y los nombres de archivos.',
+  {},
+  async () => call('agent_inbox', {}),
+)
+
+server.tool(
+  'suggest',
+  'Guarda prioridad, tamaño y autonomía de un ticket que sigue en el estado inicial. priority va de 1 urgente a 4 baja. estimate es xs, s, m o l. autonomy es suggest, pull o human. Si la respuesta dice abrir pull, resérvalo, abre la rama con su clave y registra el pull. Si dice solo sugerir, no abras el pull.',
+  {
+    ticket_id: z.string().uuid(),
+    priority: z.number().int().min(1).max(4),
+    estimate: z.enum(['xs', 's', 'm', 'l']),
+    autonomy: z.enum(['suggest', 'pull', 'human']),
+    note: z.string().optional(),
+  },
+  async ({ ticket_id, priority, estimate, autonomy, note }) => call('agent_suggest', {
+    p_ticket_id: ticket_id,
+    p_priority: priority,
+    p_estimate: estimate,
+    p_autonomy: autonomy,
+    p_note: note ?? null,
+  }),
+)
+
+server.tool(
   'recommend',
-  'Recomienda qué ticket atender. El primero es el primero de la cola del tablero. key es el nombre de la rama, por ejemplo FTCK-1. El ticket puede traer varios repos, cada uno con su rama base. Si el primero dice ejecutar, puedes tomarlo, resolverlo y abrir un pull en cada repo. Si dice sugerir, solo proponlo.',
+  'Recomienda qué ticket atender en toda la cola de trabajo. Para el estado inicial usa inbox. key es el nombre de la rama. El ticket puede traer varios repos. Si el primero dice ejecutar, puedes tomarlo y abrir un pull en cada repo. Si dice sugerir, solo proponlo.',
   {},
   async () => call('agent_recommend', {}),
 )
