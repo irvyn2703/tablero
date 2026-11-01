@@ -33,4 +33,4 @@ Settings → Pages → Source: GitHub Actions.
 
 Crea el token en Automatización. La pantalla muestra la config para Cursor: la URL del endpoint y el token. El agente lee el estado inicial, marca los repos, guarda prioridad, tamaño y autonomía, y abre el pull solo si la política lo permite.
 
-Tools: `inbox`, `assign_repos`, `suggest`, `claim`, `report_progress`, `attach_pr`, `release`, `recommend`.
+Tools: `inbox`, `search`, `assign_repos`, `suggest`, `claim`, `move`, `report_progress`, `attach_pr`, `release`, `recommend`.

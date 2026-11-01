@@ -1,23 +1,39 @@
 const protocol = '2025-03-26'
 
 const instructions = [
-  'Lee el estado inicial con inbox. catalog son los repos de la empresa. Cada ticket trae type Ticket o Requerimiento, el reporte en body y los repos ya marcados.',
-  'Marca los repos que correspondan con assign_repos, usando los nombres de catalog, antes de sugerir.',
+  'Cuando te pidan revisar tickets, lee con inbox el estado que nombren. Si no nombran uno, inbox trae el primero del flujo. catalog son los repos de la empresa. Cada ticket trae type Ticket o Requerimiento, el reporte en body y los repos ya marcados.',
+  'Antes de decidir, search con palabras del título para ver si ya existe. Si otro ticket abierto describe lo mismo, dilo en la nota y deja autonomy en human.',
   'Comprueba en el repo si el error existe, o si el requerimiento ya está resuelto.',
-  'Guarda la sugerencia con suggest: priority 1 urgente a 4 baja, estimate xs, s, m o l, y autonomy suggest, pull o human.',
-  'Si next es abrir pull, reserva con claim, abre la rama con la clave del ticket, crea el pull y regístralo con attach_pr. No lo mezcles.',
+  'Marca los repos que correspondan con assign_repos, usando los nombres de catalog.',
+  'Guarda la complejidad con suggest: priority 1 urgente a 4 baja, estimate xs, s, m o l, y autonomy suggest, pull o human.',
+  'Si next es abrir pull, reserva con claim, abre la rama con la clave del ticket, crea el pull y regístralo con attach_pr. Al final revisa ese cambio con thermos y corrige lo que pida. No lo mezcles.',
   'Si next es solo sugerir, deja la sugerencia y no abras el pull.',
+  'Cuando termines, claim si no lo reservaste y move el ticket al estado que te pidan. Si dicen asignación de prioridad, el estado es asignación de prioridad. Después release.',
 ].join(' ')
 
 const tools = [
   {
     name: 'inbox',
-    description: 'Lee los tickets del estado inicial y el catálogo de repos de la empresa. catalog son los que se pueden marcar. tickets trae el reporte, si es Ticket o Requerimiento, los repos ya marcados y los nombres de archivos.',
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    description: 'Lee los tickets de un estado y el catálogo de repos de la empresa. status es el nombre o un pedazo, por ejemplo revisión o asignación de prioridad. Si lo omites, lee el primero del flujo. catalog son los que se pueden marcar. tickets trae el reporte, si es Ticket o Requerimiento, los repos ya marcados y los nombres de archivos.',
+    inputSchema: {
+      type: 'object',
+      properties: { status: { type: 'string' } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'search',
+    description: 'Busca tickets parecidos por palabras del título o del reporte, en cualquier estado. Sirve para ver si el error ya está repetido.',
+    inputSchema: {
+      type: 'object',
+      properties: { query: { type: 'string' } },
+      required: ['query'],
+      additionalProperties: false,
+    },
   },
   {
     name: 'assign_repos',
-    description: 'Marca los repos de un ticket que sigue en el estado inicial. repos son nombres de catalog, por ejemplo Finloopmx/Frontend. Una lista vacía los quita. Sustituye los que ya tenía.',
+    description: 'Marca los repos de un ticket que sigue en trabajo. repos son nombres de catalog, por ejemplo Finloopmx/Frontend. Una lista vacía los quita. Sustituye los que ya tenía.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -30,7 +46,7 @@ const tools = [
   },
   {
     name: 'suggest',
-    description: 'Guarda prioridad, tamaño y autonomía de un ticket que sigue en el estado inicial. priority va de 1 urgente a 4 baja. estimate es xs, s, m o l. autonomy es suggest, pull o human. La respuesta dice si toca abrir el pull.',
+    description: 'Guarda prioridad, tamaño y autonomía de un ticket que sigue en trabajo. priority va de 1 urgente a 4 baja. estimate es xs, s, m o l. autonomy es suggest, pull o human. La respuesta dice si toca abrir el pull.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -80,6 +96,19 @@ const tools = [
         url: { type: 'string' },
       },
       required: ['ticket_id', 'url'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'move',
+    description: 'Pasa un ticket reservado al estado que nombren. status es el nombre o un pedazo, por ejemplo asignación de prioridad.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticket_id: { type: 'string', format: 'uuid' },
+        status: { type: 'string' },
+      },
+      required: ['ticket_id', 'status'],
       additionalProperties: false,
     },
   },
@@ -158,7 +187,15 @@ async function callRpc(name, args) {
 }
 
 function argumentsFor(name, token, args) {
-  if (name === 'inbox') return ['agent_inbox', { p_token: token }]
+  if (name === 'inbox') return ['agent_inbox', { p_token: token, p_status: args.status ?? null }]
+  if (name === 'search') return ['agent_search', { p_token: token, p_query: args.query ?? null }]
+  if (name === 'move') {
+    return ['agent_move', {
+      p_token: token,
+      p_ticket_id: args.ticket_id,
+      p_status: args.status ?? null,
+    }]
+  }
   if (name === 'recommend') return ['agent_recommend', { p_token: token }]
   if (name === 'assign_repos') {
     return ['agent_assign_repos', {

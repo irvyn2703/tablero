@@ -1,6 +1,6 @@
 begin;
 
-select plan(35);
+select plan(38);
 
 insert into public.companies (name, slug)
 values ('Acme', 'acme')
@@ -308,7 +308,7 @@ select throws_ok(
     :'ticket_id'
   ),
   'P0001',
-  'el ticket ya no está en el estado inicial'
+  'el ticket no está en trabajo'
 );
 
 select throws_ok(
@@ -335,13 +335,35 @@ select throws_ok(
     :'ticket_id'
   ),
   'P0001',
-  'el ticket ya no está en el estado inicial'
+  'el ticket no está en trabajo'
 );
 
 select is(
   (public.agent_suggest('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', :'later_id'::uuid, 2, 's', 'pull', 'Se puede en el listado') ->> 'next'),
   'solo sugerir',
   'sin la política no abre el pull'
+);
+
+select is(
+  (public.agent_inbox('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'recibido') -> 'tickets' -> 0 ->> 'type'),
+  'Requerimiento',
+  'el inbox lee el estado que se nombra'
+);
+
+select is(
+  (public.agent_search('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'saldo') -> 0 ->> 'title'),
+  'Llega después',
+  'la búsqueda encuentra un ticket parecido'
+);
+
+select is(
+  (public.agent_move(
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    (public.agent_claim('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', :'later_id'::uuid) ->> 'id')::uuid,
+    'en cola'
+  ) ->> 'status'),
+  'En cola',
+  'el agente pasa el ticket al estado nombrado'
 );
 
 select is(private.file_mime('foto.PNG'), 'image/png', 'una imagen png');

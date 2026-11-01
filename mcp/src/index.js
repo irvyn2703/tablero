@@ -14,7 +14,19 @@ if (!url || !key) {
 }
 
 const supabase = createClient(url, key)
-const server = new McpServer({ name: 'tablero', version: '0.1.0' })
+const server = new McpServer({
+  name: 'tablero',
+  version: '0.1.0',
+  instructions: [
+    'Cuando te pidan revisar tickets, lee con inbox el estado que nombren. Si no nombran uno, inbox trae el primero del flujo.',
+    'Antes de decidir, search con palabras del título para ver si ya existe. Si otro ticket abierto describe lo mismo, dilo en la nota y deja autonomy en human.',
+    'Comprueba en el repo si el error existe, o si el requerimiento ya está resuelto.',
+    'Marca los repos con assign_repos y la complejidad con suggest.',
+    'Si next es abrir pull, reserva con claim, abre la rama con la clave, registra el pull con attach_pr y al final pasa thermos. No lo mezcles.',
+    'Si next es solo sugerir, no abras el pull.',
+    'Cuando termines, claim si no lo reservaste y move el ticket al estado que te pidan. Si dicen asignación de prioridad, el estado es asignación de prioridad. Después release.',
+  ].join(' '),
+})
 
 function denied() {
   if (!token || token.startsWith('PEGA_')) {
@@ -36,14 +48,21 @@ async function call(fn, args) {
 
 server.tool(
   'inbox',
-  'Lee los tickets del estado inicial y el catálogo de repos de la empresa. catalog son los que se pueden marcar. tickets trae el reporte, si es Ticket o Requerimiento, los repos ya marcados y los nombres de archivos.',
-  {},
-  async () => call('agent_inbox', {}),
+  'Lee los tickets de un estado y el catálogo de repos de la empresa. status es el nombre o un pedazo, por ejemplo revisión o asignación de prioridad. Si lo omites, lee el primero del flujo.',
+  { status: z.string().optional() },
+  async ({ status }) => call('agent_inbox', { p_status: status ?? null }),
+)
+
+server.tool(
+  'search',
+  'Busca tickets parecidos por palabras del título o del reporte, en cualquier estado. Sirve para ver si el error ya está repetido.',
+  { query: z.string() },
+  async ({ query }) => call('agent_search', { p_query: query }),
 )
 
 server.tool(
   'assign_repos',
-  'Marca los repos de un ticket que sigue en el estado inicial. repos son nombres de catalog, por ejemplo Finloopmx/Frontend. Una lista vacía los quita. Sustituye los que ya tenía.',
+  'Marca los repos de un ticket que sigue en trabajo. repos son nombres de catalog, por ejemplo Finloopmx/Frontend. Una lista vacía los quita. Sustituye los que ya tenía.',
   {
     ticket_id: z.string().uuid(),
     repos: z.array(z.string()),
@@ -56,7 +75,7 @@ server.tool(
 
 server.tool(
   'suggest',
-  'Guarda prioridad, tamaño y autonomía de un ticket que sigue en el estado inicial. priority va de 1 urgente a 4 baja. estimate es xs, s, m o l. autonomy es suggest, pull o human. Si la respuesta dice abrir pull, resérvalo, abre la rama con su clave y registra el pull. Si dice solo sugerir, no abras el pull.',
+  'Guarda prioridad, tamaño y autonomía de un ticket que sigue en trabajo. priority va de 1 urgente a 4 baja. estimate es xs, s, m o l. autonomy es suggest, pull o human. Si la respuesta dice abrir pull, resérvalo, abre la rama con su clave, registra el pull y al final pasa thermos. Si dice solo sugerir, no abras el pull.',
   {
     ticket_id: z.string().uuid(),
     priority: z.number().int().min(1).max(4),
@@ -116,6 +135,19 @@ server.tool(
   async ({ ticket_id, url: pullUrl }) => call('agent_attach_pr', {
     p_ticket_id: ticket_id,
     p_url: pullUrl,
+  }),
+)
+
+server.tool(
+  'move',
+  'Pasa un ticket reservado al estado que nombren. status es el nombre o un pedazo, por ejemplo asignación de prioridad.',
+  {
+    ticket_id: z.string().uuid(),
+    status: z.string(),
+  },
+  async ({ ticket_id, status }) => call('agent_move', {
+    p_ticket_id: ticket_id,
+    p_status: status,
   }),
 )
 
