@@ -134,6 +134,7 @@ export function Calendar() {
       </div>
       <Alert>{error}</Alert>
       {notice && <p className="done" role="status">{notice}</p>}
+      <div className="ledger">
       <div className="days" style={{ marginBottom: '0.4rem' }}>
         {weekday.map((day) => <span key={day} className="quiet">{day}</span>)}
       </div>
@@ -201,6 +202,7 @@ export function Calendar() {
           })}
         </div>
       ))}
+      </div>
     </section>
   )
 }
