@@ -53,6 +53,15 @@ export function isAdmin(role) {
   return role === 'owner' || role === 'admin'
 }
 
+export const ticketKinds = [
+  { id: 'ticket', name: 'Ticket', hint: 'Un error' },
+  { id: 'request', name: 'Requerimiento', hint: 'Una mejora o una idea' },
+]
+
+export function kindName(id) {
+  return ticketKinds.find((kind) => kind.id === id)?.name || 'Ticket'
+}
+
 export function ticketKey(prefix, number) {
   const clean = String(prefix || '').trim().toUpperCase()
   return clean ? `${clean}-${number}` : `#${number}`

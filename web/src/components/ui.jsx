@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { formatProgress } from '../lib/format'
+import { formatProgress, ticketKinds } from '../lib/format'
 
 export function Progress({ value }) {
   const n = Math.max(0, Math.min(100, Number(value) || 0))
@@ -9,6 +9,27 @@ export function Progress({ value }) {
       <b><i style={{ width: `${n}%` }} /></b>
       <span>{label}%</span>
     </div>
+  )
+}
+
+export function KindChoice({ value, onChange }) {
+  return (
+    <fieldset className="kinds">
+      <legend>Qué es</legend>
+      {ticketKinds.map((kind) => (
+        <label className="kind" key={kind.id}>
+          <input
+            type="radio"
+            name="kind"
+            value={kind.id}
+            checked={value === kind.id}
+            onChange={() => onChange(kind.id)}
+          />
+          <strong>{kind.name}</strong>
+          <span>{kind.hint}</span>
+        </label>
+      ))}
+    </fieldset>
   )
 }
 

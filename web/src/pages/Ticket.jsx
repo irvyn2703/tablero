@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { autonomyLabel, canEdit, estimateLabel, formatWhen, memberName, messageFrom, priorityLabel, ticketKey } from '../lib/format'
+import { openTicketFile, takeFiles, uploadTicketFiles } from '../lib/files'
+import { FilePicker, SavedFiles } from '../components/Files'
 import { ActionButton, Alert, Done, Progress, useFeedback } from '../components/ui'
 
 export function Ticket() {
@@ -16,11 +18,13 @@ export function Ticket() {
   const [chosenRepos, setChosenRepos] = useState([])
   const [events, setEvents] = useState([])
   const [pulls, setPulls] = useState([])
+  const [savedFiles, setSavedFiles] = useState([])
+  const [picked, setPicked] = useState([])
   const [error, setError] = useState('')
   const { busy, done, mark, run } = useFeedback()
 
   async function load() {
-    const [ticketRes, statusRes, memberRes, sprintRes, repoRes, linkRes, eventRes, pullRes] = await Promise.all([
+    const [ticketRes, statusRes, memberRes, sprintRes, repoRes, linkRes, eventRes, pullRes, fileRes] = await Promise.all([
       supabase.from('ticket_rows').select('*').eq('id', ticketId).maybeSingle(),
       supabase.from('statuses').select('id, name').eq('company_id', companyId).order('position'),
       supabase.from('company_members').select('user_id, alias').eq('company_id', companyId),
@@ -29,8 +33,9 @@ export function Ticket() {
       supabase.from('ticket_repos').select('repo_id').eq('ticket_id', ticketId),
       supabase.from('ticket_events').select('id, body, visibility, created_at').eq('ticket_id', ticketId).order('created_at'),
       supabase.from('pull_requests').select('id, url, created_at').eq('ticket_id', ticketId).order('created_at'),
+      supabase.from('ticket_files').select('id, name, mime, byte_size, object_path, created_at').eq('ticket_id', ticketId).order('created_at'),
     ])
-    const failed = [ticketRes, statusRes, memberRes, sprintRes, repoRes, linkRes, eventRes, pullRes].find((item) => item.error)
+    const failed = [ticketRes, statusRes, memberRes, sprintRes, repoRes, linkRes, eventRes, pullRes, fileRes].find((item) => item.error)
     if (failed) {
       setError(messageFrom(failed.error))
       return
@@ -43,6 +48,7 @@ export function Ticket() {
     setChosenRepos((linkRes.data ?? []).map((link) => link.repo_id))
     setEvents(eventRes.data ?? [])
     setPulls(pullRes.data ?? [])
+    setSavedFiles(fileRes.data ?? [])
   }
 
   useEffect(() => { load() }, [ticketId, companyId])
@@ -191,6 +197,65 @@ export function Ticket() {
         )}
         <Done name="fields" mark={mark}>{done}</Done>
       </form>
+      <SavedFiles
+        files={savedFiles}
+        editable={editable}
+        busy={busy}
+        onOpen={async (file) => {
+          try {
+            await openTicketFile(file)
+          } catch (openError) {
+            setError(messageFrom(openError))
+          }
+        }}
+        onRemove={(file) => run(file.id, async () => {
+          setError('')
+          const removed = await supabase.storage.from('ticket-files').remove([file.object_path])
+          if (removed.error) {
+            setError(messageFrom(removed.error))
+            return false
+          }
+          const { error: removeError } = await supabase.rpc('remove_ticket_file', { p_file_id: file.id })
+          if (removeError) {
+            setError(messageFrom(removeError))
+            return false
+          }
+          load()
+        }, 'Archivo quitado.')}
+      />
+      {editable && (
+        <form className="panel" style={{ marginTop: '0.8rem' }} onSubmit={(event) => {
+          event.preventDefault()
+          run('upload', async () => {
+            setError('')
+            const failed = await uploadTicketFiles({ ticketId, files: picked })
+            setPicked(failed.map((item) => item.file))
+            if (failed.length) {
+              setError(failed.map((item) => `${item.file.name}: ${item.error}`).join(' '))
+              return false
+            }
+            load()
+          }, 'Archivos subidos.')
+        }}
+        >
+          <FilePicker
+            files={picked}
+            disabled={Boolean(busy)}
+            onPick={(list) => {
+              const next = takeFiles(picked, list)
+              setPicked(next.files)
+              setError(next.error)
+            }}
+            onRemove={(index) => setPicked((current) => current.filter((_, item) => item !== index))}
+          />
+          {picked.length > 0 && (
+            <ActionButton name="upload" busy={busy} pending="Subiendo…" className="btn" type="submit" style={{ marginTop: '0.8rem' }}>
+              Subir archivos
+            </ActionButton>
+          )}
+          <Done name="upload" mark={mark}>{done}</Done>
+        </form>
+      )}
       <form onSubmit={saveProgress} className="panel" style={{ marginTop: '0.8rem' }}>
         <div className="grid-2">
           <label className="field">
