@@ -20,13 +20,17 @@
   gap: 0.15rem;
 }
 
-.day .closed {
-  color: var(--brass);
+.day .closed,
+.day .moved {
   font-size: 0.72rem;
   line-height: 1.25;
   text-decoration: none;
   overflow-wrap: anywhere;
 }
+
+.day .closed { color: var(--brass); }
+
+.day .moved { color: var(--pine); }
 
 .day.out { opacity: 0.35; }
 
@@ -102,7 +106,8 @@
     padding: 0.15rem 0;
     text-align: center;
   }
-  .day .closed { width: 100%; text-align: center; }
+  .day .closed,
+  .day .moved { width: 100%; text-align: center; }
   .closed-title { display: none; }
   .bar { min-width: 0; padding: 0.2rem 0.3rem; }
   .bar-inline { display: none; }

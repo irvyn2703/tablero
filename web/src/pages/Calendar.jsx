@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { marksByDay } from '../lib/calendarMarks'
 import { canEdit, memberName, messageFrom, ticketKey } from '../lib/format'
 import { Alert, Progress, TicketChips } from '../components/ui'
 
@@ -14,30 +15,6 @@ function keyOf(date) {
 
 function finished(ticket) {
   return ticket.status_kind === 'close' || Number(ticket.progress) >= 100
-}
-
-function closures(tickets, events) {
-  const byTicket = new Map()
-  events.forEach((event) => {
-    const list = byTicket.get(event.ticket_id) ?? []
-    list.push(event)
-    byTicket.set(event.ticket_id, list)
-  })
-  return tickets.flatMap((ticket) => {
-    if (!finished(ticket)) return []
-    const changes = (byTicket.get(ticket.id) ?? []).filter((event) => / · \d+(?:\.\d+)?%$/.test(event.body))
-    if (changes.length === 0) return []
-    const closeName = changes.at(-1).body.replace(/ · \d+(?:\.\d+)?%$/, '')
-    let closedAt = changes.at(-1).created_at
-    if (ticket.status_kind === 'close') {
-      for (let index = changes.length - 1; index >= 0; index -= 1) {
-        const name = changes[index].body.replace(/ · \d+(?:\.\d+)?%$/, '')
-        if (name !== closeName) break
-        closedAt = changes[index].created_at
-      }
-    }
-    return [{ ...ticket, closedAt }]
-  })
 }
 
 function weeksOf(year, month) {
@@ -95,14 +72,7 @@ export function Calendar() {
   }, [location.state])
 
   const weeks = useMemo(() => weeksOf(cursor.year, cursor.month), [cursor])
-  const closedByDay = useMemo(() => {
-    const map = new Map()
-    closures(tickets, events).forEach((ticket) => {
-      const key = keyOf(new Date(ticket.closedAt))
-      map.set(key, [...(map.get(key) ?? []), ticket])
-    })
-    return map
-  }, [tickets, events])
+  const marks = useMemo(() => marksByDay(tickets, events, keyOf), [tickets, events])
   const assigneeById = useMemo(
     () => new Map(members.map((member) => [member.user_id, memberName(member)])),
     [members],
@@ -146,10 +116,14 @@ export function Calendar() {
               return (
                 <div key={key} className={day.getMonth() === cursor.month ? 'day' : 'day out'}>
                   <span>{day.getDate()}</span>
-                  {(closedByDay.get(key) ?? []).map((ticket) => (
-                    <Link key={ticket.id} className="closed" to={`../t/${ticket.id}`}>
-                      <span className="closed-key">{ticketKey(company.ticket_prefix, ticket.public_number)}</span>
-                      <span className="closed-title"> {ticket.title}</span>
+                  {(marks.get(key) ?? []).map((mark) => (
+                    <Link
+                      key={`${mark.id}-${mark.statusName}`}
+                      className={Number(mark.percent) >= 100 ? 'closed' : 'moved'}
+                      to={`../t/${mark.id}`}
+                    >
+                      <span className="closed-key">{ticketKey(company.ticket_prefix, mark.public_number)}</span>
+                      <span className="closed-title"> {mark.statusName}</span>
                     </Link>
                   ))}
                 </div>
