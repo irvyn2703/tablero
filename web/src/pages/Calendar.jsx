@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { marksByDay } from '../lib/calendarMarks'
-import { canEdit, memberName, messageFrom, ticketKey } from '../lib/format'
+import { canEdit, formatProgress, memberName, messageFrom, ticketKey } from '../lib/format'
 import { Alert, Progress, TicketChips } from '../components/ui'
 
 const weekday = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
@@ -116,16 +116,25 @@ export function Calendar() {
               return (
                 <div key={key} className={day.getMonth() === cursor.month ? 'day' : 'day out'}>
                   <span>{day.getDate()}</span>
-                  {(marks.get(key) ?? []).map((mark) => (
-                    <Link
-                      key={`${mark.id}-${mark.statusName}`}
-                      className={Number(mark.percent) >= 100 ? 'closed' : 'moved'}
-                      to={`../t/${mark.id}`}
-                    >
-                      <span className="closed-key">{ticketKey(company.ticket_prefix, mark.public_number)}</span>
-                      <span className="closed-title"> {mark.statusName}</span>
-                    </Link>
-                  ))}
+                  <div className="marks">
+                    {(marks.get(key) ?? []).map((mark) => {
+                      const percent = formatProgress(mark.percent)
+                      const name = ticketKey(company.ticket_prefix, mark.public_number)
+                      return (
+                        <Link
+                          key={`${mark.id}-${mark.statusName}`}
+                          className={Number(mark.percent) >= 100 ? 'mark closed' : 'mark moved'}
+                          to={`../t/${mark.id}`}
+                        >
+                          <span className="mark-line">
+                            <span className="closed-key">{name}</span>
+                            <span className="closed-percent">{percent}%</span>
+                          </span>
+                          <span className="closed-title">{mark.statusName}</span>
+                        </Link>
+                      )
+                    })}
+                  </div>
                 </div>
               )
             })}
@@ -157,14 +166,18 @@ export function Calendar() {
                 {carried.length === 0
                   ? <div className="quiet">Sin tickets. Asígnale este sprint en la ficha.</div>
                   : (
-                    <ul>
+                    <ul className="sprint-tickets">
                       {carried.map((ticket) => (
                         <li key={ticket.id}>
-                          <Link to={`../t/${ticket.id}`}>{ticketKey(company.ticket_prefix, ticket.public_number)} {ticket.title}</Link>
+                          <Link className="sprint-name" to={`../t/${ticket.id}`}>
+                            <span className="closed-key">{ticketKey(company.ticket_prefix, ticket.public_number)}</span>
+                            <span className="sprint-copy">
+                              <span className="sprint-title">{ticket.title}</span>
+                              {finished(ticket) && <span className="quiet">Completo · {assigneeOf(ticket)}</span>}
+                            </span>
+                          </Link>
                           <TicketChips priority={ticket.priority} estimate={ticket.estimate} />
-                          {finished(ticket)
-                            ? <span className="quiet">Completo · {assigneeOf(ticket)}</span>
-                            : <Progress value={ticket.progress} />}
+                          <Progress value={ticket.progress} />
                         </li>
                       ))}
                     </ul>
@@ -173,9 +186,8 @@ export function Calendar() {
             )
             return (
               <div className="bar-row" key={sprint.id}>
-                <div className={showTickets ? 'bar' : 'bar slim'} style={{ gridColumn: `${from + 1} / ${to + 2}` }}>
+                <div className="bar slim" style={{ gridColumn: `${from + 1} / ${to + 2}` }}>
                   <strong className="bar-name">{sprint.name}</strong>
-                  {showTickets && <div className="bar-inline">{detail}</div>}
                 </div>
                 {showTickets && <div className="bar-detail">{detail}</div>}
               </div>

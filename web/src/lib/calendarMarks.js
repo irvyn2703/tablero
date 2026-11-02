@@ -26,5 +26,8 @@ export function marksByDay(tickets, events, dayKey) {
   latest.forEach((mark) => {
     map.set(mark.day, [...(map.get(mark.day) ?? []), mark])
   })
+  map.forEach((list) => {
+    list.sort((a, b) => a.public_number - b.public_number)
+  })
   return map
 }
