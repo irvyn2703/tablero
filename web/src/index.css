@@ -227,6 +227,41 @@ h2 { font-size: 1.45rem; margin: 0; }
   width: 100%;
 }
 
+.field select {
+  appearance: none;
+  padding-right: 2.6rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%235e584f' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round' d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1.25rem center;
+  background-size: 0.72rem;
+}
+
+.field input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  padding: 0;
+  flex: none;
+  accent-color: var(--pine);
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: fit-content;
+}
+
+.check-row span {
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+}
+
+.check-row .quiet { font-weight: 400; color: var(--muted); }
+
 .field textarea { min-height: 8rem; resize: vertical; }
 .field textarea.short { min-height: 4.25rem; }
 

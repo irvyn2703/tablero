@@ -247,7 +247,7 @@ export function Ticket() {
           {repos.length === 0
             ? <p className="quiet">Agrega repos en la sección Repos.</p>
             : repos.map((repo) => (
-              <label className="cluster" key={repo.id}>
+              <label className="check-row" key={repo.id}>
                 <input
                   type="checkbox"
                   checked={chosenRepos.includes(repo.id)}
@@ -268,7 +268,7 @@ export function Ticket() {
           {categories.length === 0
             ? <p className="quiet">Agrégalas en el tablero. Un ticket puede llevar varias.</p>
             : categories.map((category) => (
-              <label className="cluster" key={category.id}>
+              <label className="check-row" key={category.id}>
                 <input
                   type="checkbox"
                   checked={chosenCategories.includes(category.id)}
