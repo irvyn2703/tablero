@@ -123,33 +123,60 @@ export function Versions() {
 
   return (
     <section className="page">
-      <p className="kicker">Versiones</p>
-      <h1>Lo que salió en cada entrega.</h1>
+      <div className="release-head">
+        <div>
+          <p className="kicker">Versiones</p>
+          <h1>Lo que salió en cada entrega.</h1>
+        </div>
+        {editable && (
+          <form className="release-new" onSubmit={addVersion}>
+            <label className="field">
+              <span>Nueva versión</span>
+              <input
+                value={name}
+                placeholder="Nombre"
+                maxLength={80}
+                onChange={(event) => setName(event.target.value)}
+                required
+              />
+            </label>
+            <ActionButton name="add" busy={busy} pending="Agregando…" className="btn" type="submit">
+              Agregar
+            </ActionButton>
+          </form>
+        )}
+      </div>
+      <Done name="add" mark={mark}>{done}</Done>
       <Alert>{error}</Alert>
       {versions.length === 0 && <p className="quiet">Todavía no hay versiones.</p>}
-      <div className="list">
+      <div className="releases">
         {versions.map((version) => {
           const held = inside(version.id)
+          const count = held.length === 1 ? '1 ticket' : `${held.length} tickets`
           return (
-            <article className="panel" key={version.id}>
-              <div className="row">
-                <strong>{version.name}</strong>
-                <span className="quiet">{held.length === 1 ? '1 ticket' : `${held.length} tickets`}</span>
-              </div>
+            <article className="release" key={version.id}>
+              <header>
+                <div>
+                  <p className="kicker">Versión</p>
+                  <h2>{version.name}</h2>
+                </div>
+                <span className="release-count">{count}</span>
+              </header>
               {held.length === 0
-                ? <p className="quiet">Sin tickets. Mete aquí los que se resolvieron en esta versión.</p>
+                ? <p className="quiet">Mete aquí los tickets que se resolvieron en esta entrega.</p>
                 : (
-                  <ul className="version-tickets">
+                  <ul>
                     {held.map((ticket) => (
                       <li key={ticket.id}>
                         <Link to={`/e/${companyId}/t/${ticket.id}`}>
-                          {ticketKey(company.ticket_prefix, ticket.public_number)} {ticket.title}
+                          <em>{ticketKey(company.ticket_prefix, ticket.public_number)}</em>
+                          <span>{ticket.title}</span>
                         </Link>
                         {editable && (
                           <ActionButton
                             name={`out-${ticket.id}`}
                             busy={busy}
-                            pending="Quitando…"
+                            pending="…"
                             className="text-btn"
                             type="button"
                             onClick={() => takeOut(ticket.id)}
@@ -162,66 +189,49 @@ export function Versions() {
                   </ul>
                 )}
               {editable && (
-                <div className="cluster" style={{ marginTop: '0.8rem' }}>
-                  <select
-                    value={picked[version.id] || ''}
-                    onChange={(event) => setPicked((current) => ({ ...current, [version.id]: event.target.value }))}
-                  >
-                    <option value="">Ticket resuelto</option>
-                    {loose.map((ticket) => (
-                      <option key={ticket.id} value={ticket.id}>
-                        {ticketKey(company.ticket_prefix, ticket.public_number)} {ticket.title}
-                      </option>
-                    ))}
-                  </select>
+                <form className="release-add" onSubmit={(event) => { event.preventDefault(); place(version.id) }}>
+                  <label className="field">
+                    <span>Ticket resuelto</span>
+                    <select
+                      value={picked[version.id] || ''}
+                      onChange={(event) => setPicked((current) => ({ ...current, [version.id]: event.target.value }))}
+                    >
+                      <option value="">{loose.length === 0 ? 'No hay pendientes' : 'Elegir'}</option>
+                      {loose.map((ticket) => (
+                        <option key={ticket.id} value={ticket.id}>
+                          {ticketKey(company.ticket_prefix, ticket.public_number)} {ticket.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <ActionButton
                     name={`place-${version.id}`}
                     busy={busy}
                     pending="Metiendo…"
                     className="btn"
-                    type="button"
-                    onClick={() => place(version.id)}
+                    type="submit"
                     disabled={!picked[version.id]}
                   >
                     Meter
                   </ActionButton>
-                  <ActionButton
-                    name={`remove-${version.id}`}
-                    busy={busy}
-                    pending="Quitando…"
-                    className="btn danger"
-                    type="button"
-                    onClick={() => removeVersion(version.id)}
-                  >
-                    Quitar versión
-                  </ActionButton>
-                </div>
+                </form>
               )}
-              {editable && loose.length === 0 && (
-                <p className="quiet" style={{ marginTop: '0.45rem' }}>No hay tickets resueltos fuera de una versión.</p>
+              {editable && (
+                <ActionButton
+                  name={`remove-${version.id}`}
+                  busy={busy}
+                  pending="Quitando…"
+                  className="text-btn release-remove"
+                  type="button"
+                  onClick={() => removeVersion(version.id)}
+                >
+                  Quitar versión
+                </ActionButton>
               )}
             </article>
           )
         })}
       </div>
-      {editable && (
-        <form className="panel" onSubmit={addVersion} style={{ marginTop: '1rem', maxWidth: '28rem' }}>
-          <label className="field">
-            <span>Nueva versión</span>
-            <input
-              value={name}
-              placeholder="1.4"
-              maxLength={80}
-              onChange={(event) => setName(event.target.value)}
-              required
-            />
-          </label>
-          <ActionButton name="add" busy={busy} pending="Agregando…" className="btn" type="submit" style={{ marginTop: '0.8rem' }}>
-            Agregar
-          </ActionButton>
-          <Done name="add" mark={mark}>{done}</Done>
-        </form>
-      )}
     </section>
   )
 }
