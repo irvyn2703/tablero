@@ -8,6 +8,7 @@ import { Board } from './pages/Board'
 import { NewTicket } from './pages/NewTicket'
 import { Calendar } from './pages/Calendar'
 import { SprintForm } from './pages/SprintForm'
+import { Versions } from './pages/Versions'
 import { Ticket } from './pages/Ticket'
 import { Statuses } from './pages/Statuses'
 import { Members } from './pages/Members'
@@ -62,6 +63,7 @@ export function App() {
             <Route path="calendario" element={<Calendar />} />
             <Route path="calendario/nuevo" element={<SprintForm />} />
             <Route path="calendario/s/:sprintId" element={<SprintForm />} />
+            <Route path="versiones" element={<Versions />} />
             <Route path="t/:ticketId" element={<Ticket />} />
             <Route path="estados" element={<Statuses />} />
             <Route path="miembros" element={<Members />} />

@@ -7,6 +7,7 @@ import { ActionButton, Alert, useFeedback } from './ui'
 const links = [
   ['', 'Tablero'],
   ['calendario', 'Calendario'],
+  ['versiones', 'Versiones'],
 ]
 
 const adminLinks = [

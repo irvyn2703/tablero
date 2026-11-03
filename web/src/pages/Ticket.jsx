@@ -16,6 +16,7 @@ export function Ticket() {
   const [statuses, setStatuses] = useState([])
   const [members, setMembers] = useState([])
   const [sprints, setSprints] = useState([])
+  const [versions, setVersions] = useState([])
   const [repos, setRepos] = useState([])
   const [chosenRepos, setChosenRepos] = useState([])
   const [events, setEvents] = useState([])
@@ -27,11 +28,12 @@ export function Ticket() {
   const { busy, done, mark, run } = useFeedback()
 
   async function load() {
-    const [ticketRes, statusRes, memberRes, sprintRes, repoRes, linkRes, eventRes, messageRes, pullRes, fileRes] = await Promise.all([
+    const [ticketRes, statusRes, memberRes, sprintRes, versionRes, repoRes, linkRes, eventRes, messageRes, pullRes, fileRes] = await Promise.all([
       supabase.from('ticket_rows').select('*').eq('id', ticketId).maybeSingle(),
       supabase.from('statuses').select('id, name, allows_delete').eq('company_id', companyId).order('position'),
       supabase.from('company_members').select('user_id, alias').eq('company_id', companyId),
       supabase.from('sprints').select('id, name').eq('company_id', companyId).order('starts_on'),
+      supabase.from('versions').select('id, name').eq('company_id', companyId).order('created_at', { ascending: false }),
       supabase.from('repos').select('id, github_full_name, default_branch').eq('company_id', companyId),
       supabase.from('ticket_repos').select('repo_id').eq('ticket_id', ticketId),
       supabase.from('ticket_events').select('id, body, visibility, created_at').eq('ticket_id', ticketId).order('created_at'),
@@ -39,7 +41,7 @@ export function Ticket() {
       supabase.from('pull_requests').select('id, url, created_at').eq('ticket_id', ticketId).order('created_at'),
       supabase.from('ticket_files').select('id, name, mime, byte_size, object_path, created_at').eq('ticket_id', ticketId).order('created_at'),
     ])
-    const failed = [ticketRes, statusRes, memberRes, sprintRes, repoRes, linkRes, eventRes, messageRes, pullRes, fileRes].find((item) => item.error)
+    const failed = [ticketRes, statusRes, memberRes, sprintRes, versionRes, repoRes, linkRes, eventRes, messageRes, pullRes, fileRes].find((item) => item.error)
     if (failed) {
       setError(messageFrom(failed.error))
       return
@@ -48,6 +50,7 @@ export function Ticket() {
     setStatuses(statusRes.data ?? [])
     setMembers(memberRes.data ?? [])
     setSprints(sprintRes.data ?? [])
+    setVersions(versionRes.data ?? [])
     setRepos(repoRes.data ?? [])
     setChosenRepos((linkRes.data ?? []).map((link) => link.repo_id))
     setEvents(eventRes.data ?? [])
@@ -110,6 +113,7 @@ export function Ticket() {
         autonomy: ticket.autonomy,
         assignee_id: ticket.assignee_id || null,
         sprint_id: ticket.sprint_id || null,
+        version_id: ticket.version_id || null,
       }).eq('id', ticketId)
       if (updateError) {
         setError(messageFrom(updateError))
@@ -208,6 +212,13 @@ export function Ticket() {
             <select value={ticket.sprint_id || ''} onChange={(event) => patch({ sprint_id: event.target.value })} disabled={!editable}>
               <option value="">Backlog</option>
               {sprints.map((sprint) => <option key={sprint.id} value={sprint.id}>{sprint.name}</option>)}
+            </select>
+          </label>
+          <label className="field">
+            <span>Versión</span>
+            <select value={ticket.version_id || ''} onChange={(event) => patch({ version_id: event.target.value })} disabled={!editable}>
+              <option value="">Sin versión</option>
+              {versions.map((version) => <option key={version.id} value={version.id}>{version.name}</option>)}
             </select>
           </label>
         </div>
