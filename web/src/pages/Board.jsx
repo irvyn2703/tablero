@@ -201,15 +201,16 @@ export function Board() {
     }, 'Categoría agregada.')
   }
 
-  function removeCategory(id) {
-    return run(`category-${id}`, async () => {
+  function removeCategory(category) {
+    if (!window.confirm(`Se quita ${category.name}. También sale de los tickets que la tenían.`)) return
+    return run(`category-${category.id}`, async () => {
       setError('')
-      const { error: deleteError } = await supabase.from('categories').delete().eq('id', id).eq('company_id', companyId)
+      const { error: deleteError } = await supabase.from('categories').delete().eq('id', category.id).eq('company_id', companyId)
       if (deleteError) {
         setError(messageFrom(deleteError))
         return false
       }
-      setPickedCats((current) => current.filter((item) => item !== id))
+      setPickedCats((current) => current.filter((item) => item !== category.id))
       await load()
     }, 'Categoría quitada.')
   }
@@ -265,7 +266,7 @@ export function Board() {
                   type="button"
                   aria-label={`Quitar ${category.name}`}
                   disabled={Boolean(busy)}
-                  onClick={() => removeCategory(category.id)}
+                  onClick={() => removeCategory(category)}
                 >
                   ×
                 </button>
