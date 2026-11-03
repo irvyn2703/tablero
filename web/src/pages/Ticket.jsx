@@ -19,6 +19,8 @@ export function Ticket() {
   const [versions, setVersions] = useState([])
   const [repos, setRepos] = useState([])
   const [chosenRepos, setChosenRepos] = useState([])
+  const [categories, setCategories] = useState([])
+  const [chosenCategories, setChosenCategories] = useState([])
   const [events, setEvents] = useState([])
   const [messages, setMessages] = useState([])
   const [pulls, setPulls] = useState([])
@@ -28,7 +30,7 @@ export function Ticket() {
   const { busy, done, mark, run } = useFeedback()
 
   async function load() {
-    const [ticketRes, statusRes, memberRes, sprintRes, versionRes, repoRes, linkRes, eventRes, messageRes, pullRes, fileRes] = await Promise.all([
+    const [ticketRes, statusRes, memberRes, sprintRes, versionRes, repoRes, linkRes, categoryRes, categoryLinkRes, eventRes, messageRes, pullRes, fileRes] = await Promise.all([
       supabase.from('ticket_rows').select('*').eq('id', ticketId).maybeSingle(),
       supabase.from('statuses').select('id, name, allows_delete').eq('company_id', companyId).order('position'),
       supabase.from('company_members').select('user_id, alias').eq('company_id', companyId),
@@ -36,12 +38,14 @@ export function Ticket() {
       supabase.from('versions').select('id, name').eq('company_id', companyId).order('created_at', { ascending: false }),
       supabase.from('repos').select('id, github_full_name, default_branch').eq('company_id', companyId),
       supabase.from('ticket_repos').select('repo_id').eq('ticket_id', ticketId),
+      supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
+      supabase.from('ticket_categories').select('category_id').eq('ticket_id', ticketId),
       supabase.from('ticket_events').select('id, body, visibility, created_at').eq('ticket_id', ticketId).order('created_at'),
       supabase.from('ticket_messages').select('id, side, author_label, body, created_at').eq('ticket_id', ticketId).order('created_at'),
       supabase.from('pull_requests').select('id, url, created_at').eq('ticket_id', ticketId).order('created_at'),
       supabase.from('ticket_files').select('id, name, mime, byte_size, object_path, created_at').eq('ticket_id', ticketId).order('created_at'),
     ])
-    const failed = [ticketRes, statusRes, memberRes, sprintRes, versionRes, repoRes, linkRes, eventRes, messageRes, pullRes, fileRes].find((item) => item.error)
+    const failed = [ticketRes, statusRes, memberRes, sprintRes, versionRes, repoRes, linkRes, categoryRes, categoryLinkRes, eventRes, messageRes, pullRes, fileRes].find((item) => item.error)
     if (failed) {
       setError(messageFrom(failed.error))
       return
@@ -53,6 +57,8 @@ export function Ticket() {
     setVersions(versionRes.data ?? [])
     setRepos(repoRes.data ?? [])
     setChosenRepos((linkRes.data ?? []).map((link) => link.repo_id))
+    setCategories(categoryRes.data ?? [])
+    setChosenCategories((categoryLinkRes.data ?? []).map((link) => link.category_id))
     setEvents(eventRes.data ?? [])
     setMessages((messageRes.data ?? []).map((message) => ({
       id: message.id,
@@ -124,12 +130,26 @@ export function Ticket() {
         setError(messageFrom(clearError))
         return false
       }
-      if (chosenRepos.length === 0) return
-      const { error: linkError } = await supabase.from('ticket_repos').insert(
-        chosenRepos.map((repoId) => ({ company_id: companyId, ticket_id: ticketId, repo_id: repoId })),
+      if (chosenRepos.length > 0) {
+        const { error: linkError } = await supabase.from('ticket_repos').insert(
+          chosenRepos.map((repoId) => ({ company_id: companyId, ticket_id: ticketId, repo_id: repoId })),
+        )
+        if (linkError) {
+          setError(messageFrom(linkError))
+          return false
+        }
+      }
+      const { error: clearCategories } = await supabase.from('ticket_categories').delete().eq('ticket_id', ticketId).eq('company_id', companyId)
+      if (clearCategories) {
+        setError(messageFrom(clearCategories))
+        return false
+      }
+      if (chosenCategories.length === 0) return
+      const { error: categoryError } = await supabase.from('ticket_categories').insert(
+        chosenCategories.map((categoryId) => ({ company_id: companyId, ticket_id: ticketId, category_id: categoryId })),
       )
-      if (linkError) {
-        setError(messageFrom(linkError))
+      if (categoryError) {
+        setError(messageFrom(categoryError))
         return false
       }
     }, 'Ficha guardada.')
@@ -240,6 +260,26 @@ export function Ticket() {
                 />
                 <span>{repo.github_full_name}</span>
                 <span className="quiet">{repo.default_branch}</span>
+              </label>
+            ))}
+        </div>
+        <div className="field" style={{ marginTop: '0.8rem' }}>
+          <span>Categorías</span>
+          {categories.length === 0
+            ? <p className="quiet">Agrégalas en el tablero. Un ticket puede llevar varias.</p>
+            : categories.map((category) => (
+              <label className="cluster" key={category.id}>
+                <input
+                  type="checkbox"
+                  checked={chosenCategories.includes(category.id)}
+                  disabled={!editable}
+                  onChange={(event) => setChosenCategories((current) => (
+                    event.target.checked
+                      ? [...current, category.id]
+                      : current.filter((id) => id !== category.id)
+                  ))}
+                />
+                <span>{category.name}</span>
               </label>
             ))}
         </div>

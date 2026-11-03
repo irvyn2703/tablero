@@ -3,7 +3,7 @@ import { Link, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { canEdit, laneVars, messageFrom, ticketKey } from '../lib/format'
 import { discardTicket } from '../lib/files'
-import { Alert, Done, Progress, TicketChips, useFeedback } from '../components/ui'
+import { ActionButton, Alert, Done, Progress, TicketChips, useFeedback } from '../components/ui'
 
 const PAGE = 12
 
@@ -17,20 +17,29 @@ export function Board() {
   const [draggingId, setDraggingId] = useState('')
   const [drop, setDrop] = useState(null)
   const [shown, setShown] = useState({})
+  const [categories, setCategories] = useState([])
+  const [links, setLinks] = useState([])
+  const [pickedCats, setPickedCats] = useState([])
+  const [categoryName, setCategoryName] = useState('')
   const dragRef = useRef(null)
   const { busy, done, mark, run } = useFeedback()
 
   async function load() {
-    const [statusRes, ticketRes] = await Promise.all([
+    const [statusRes, ticketRes, categoryRes, linkRes] = await Promise.all([
       supabase.from('statuses').select('id, name, kind, position, weight, color, allows_delete').eq('company_id', companyId).order('position'),
       supabase.from('ticket_rows').select('id, public_number, title, status_id, progress, local_percent, priority, estimate, rank').eq('company_id', companyId).order('rank'),
+      supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
+      supabase.from('ticket_categories').select('ticket_id, category_id').eq('company_id', companyId),
     ])
-    if (statusRes.error || ticketRes.error) {
-      setError(messageFrom(statusRes.error || ticketRes.error))
+    const failed = [statusRes, ticketRes, categoryRes, linkRes].find((item) => item.error)
+    if (failed) {
+      setError(messageFrom(failed.error))
       return
     }
     setStatuses(statusRes.data ?? [])
     setTickets(ticketRes.data ?? [])
+    setCategories(categoryRes.data ?? [])
+    setLinks(linkRes.data ?? [])
   }
 
   useEffect(() => {
@@ -153,6 +162,58 @@ export function Board() {
     }, 'Ticket eliminado.')
   }
 
+  function categoriesOf(ticketId) {
+    const ids = links.filter((link) => link.ticket_id === ticketId).map((link) => link.category_id)
+    return categories.filter((category) => ids.includes(category.id))
+  }
+
+  function matches(ticket) {
+    if (pickedCats.length === 0) return true
+    const ids = links.filter((link) => link.ticket_id === ticket.id).map((link) => link.category_id)
+    return pickedCats.some((id) => ids.includes(id))
+  }
+
+  function toggleCat(id) {
+    setPickedCats((current) => (
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+    ))
+  }
+
+  async function addCategory(event) {
+    event.preventDefault()
+    await run('category', async () => {
+      setError('')
+      const name = categoryName.trim()
+      if (!name) {
+        setError('La categoría lleva nombre.')
+        return false
+      }
+      const { error: insertError } = await supabase.from('categories').insert({
+        company_id: companyId,
+        name,
+      })
+      if (insertError) {
+        setError(insertError.code === '23505' ? 'Ya existe esa categoría.' : messageFrom(insertError))
+        return false
+      }
+      setCategoryName('')
+      await load()
+    }, 'Categoría agregada.')
+  }
+
+  function removeCategory(id) {
+    return run(`category-${id}`, async () => {
+      setError('')
+      const { error: deleteError } = await supabase.from('categories').delete().eq('id', id).eq('company_id', companyId)
+      if (deleteError) {
+        setError(messageFrom(deleteError))
+        return false
+      }
+      setPickedCats((current) => current.filter((item) => item !== id))
+      await load()
+    }, 'Categoría quitada.')
+  }
+
   function move(ticketId, statusId) {
     return run('move', async () => {
       setError('')
@@ -186,9 +247,50 @@ export function Board() {
       <Alert>{error}</Alert>
       {busy === 'move' && <p className="done" role="status">Moviendo el ticket…</p>}
       <Done name={mark} mark={mark}>{done}</Done>
+      <div className="cat-bar">
+        <div className="cat-list" role="group" aria-label="Filtrar por categoría">
+          {categories.map((category) => (
+            <span className="cat-item" key={category.id}>
+              <button
+                className={pickedCats.includes(category.id) ? 'cat on' : 'cat'}
+                type="button"
+                aria-pressed={pickedCats.includes(category.id)}
+                onClick={() => toggleCat(category.id)}
+              >
+                {category.name}
+              </button>
+              {editable && (
+                <button
+                  className="cat-x"
+                  type="button"
+                  aria-label={`Quitar ${category.name}`}
+                  disabled={Boolean(busy)}
+                  onClick={() => removeCategory(category.id)}
+                >
+                  ×
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+        {editable && (
+          <form className="cat-new" onSubmit={addCategory}>
+            <input
+              value={categoryName}
+              placeholder="Nueva categoría"
+              maxLength={40}
+              aria-label="Nueva categoría"
+              onChange={(event) => setCategoryName(event.target.value)}
+            />
+            <ActionButton name="category" busy={busy} pending="…" className="btn" type="submit">
+              Agregar
+            </ActionButton>
+          </form>
+        )}
+      </div>
       <div className="board">
         {statuses.map((status) => {
-          const columnTickets = tickets.filter((ticket) => ticket.status_id === status.id)
+          const columnTickets = tickets.filter((ticket) => ticket.status_id === status.id && matches(ticket))
           const limit = Math.min(shown[status.id] ?? PAGE, columnTickets.length)
           const visible = columnTickets.slice(0, limit)
           const hidden = columnTickets.length - visible.length
@@ -246,6 +348,13 @@ export function Board() {
                 </div>
                 <Link className="card-body" to={`t/${ticket.id}`}>
                   <p>{ticket.title}</p>
+                  {categoriesOf(ticket.id).length > 0 && (
+                    <span className="card-cats">
+                      {categoriesOf(ticket.id).map((category) => (
+                        <span key={category.id}>{category.name}</span>
+                      ))}
+                    </span>
+                  )}
                   <TicketChips priority={ticket.priority} estimate={ticket.estimate} />
                   <Progress value={ticket.progress} />
                 </Link>

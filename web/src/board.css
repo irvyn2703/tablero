@@ -131,6 +131,73 @@
 .grip:active { cursor: grabbing; }
 .card-delete { width: 100%; margin-top: 0.55rem; }
 
+.cat-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.8rem;
+  margin: 0 0 1rem;
+}
+
+.cat-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.cat-item { display: inline-flex; align-items: stretch; }
+
+.cat, .cat-x, .cat-new input {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.cat {
+  padding: 0.28rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.cat.on {
+  background: var(--pine-soft);
+  border-color: var(--pine);
+  color: var(--pine);
+}
+
+.cat-x {
+  padding: 0 0.4rem;
+  border-left: 0;
+  color: var(--muted);
+  line-height: 1;
+}
+
+.cat-new {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.cat-new input {
+  width: 11rem;
+  padding: 0.4rem 0.55rem;
+}
+
+.card-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0.35rem 0 0.15rem;
+}
+
+.card-cats span {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
 @media (max-width: 860px) {
   .card-order .btn { width: 2.5rem; height: 2.35rem; min-height: 0; }
   .board {
