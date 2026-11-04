@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { canEdit, laneVars, messageFrom, ticketKey } from '../lib/format'
@@ -22,7 +22,47 @@ export function Board() {
   const [pickedCats, setPickedCats] = useState([])
   const [categoryName, setCategoryName] = useState('')
   const dragRef = useRef(null)
+  const boardRef = useRef(null)
+  const spots = useRef(new Map())
   const { busy, done, mark, run } = useFeedback()
+
+  useLayoutEffect(() => {
+    const board = boardRef.current
+    if (!board) return
+    const origin = board.getBoundingClientRect()
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const next = new Map()
+    board.querySelectorAll('[data-ticket]').forEach((card) => {
+      const id = card.dataset.ticket
+      const rect = card.getBoundingClientRect()
+      const shift = new DOMMatrix(getComputedStyle(card).transform)
+      const spot = {
+        left: rect.left - origin.left - shift.m41 + board.scrollLeft,
+        top: rect.top - origin.top - shift.m42 + board.scrollTop,
+        status: card.dataset.status,
+      }
+      const previous = spots.current.get(id)
+      next.set(id, spot)
+      if (!previous || reduce) return
+      const dx = previous.left - spot.left
+      const dy = previous.top - spot.top
+      const moved = Math.abs(dx) > 1 || Math.abs(dy) > 1
+      if (moved) {
+        card.animate(
+          [
+            { transform: `translate(${dx}px, ${dy}px)`, zIndex: 2 },
+            { transform: 'translate(0, 0)', zIndex: 2 },
+          ],
+          { duration: 340, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+        )
+      }
+      if (previous.status !== spot.status) {
+        card.classList.add('is-settling')
+        card.addEventListener('animationend', () => card.classList.remove('is-settling'), { once: true })
+      }
+    })
+    spots.current = next
+  })
 
   async function load() {
     const [statusRes, ticketRes, categoryRes, linkRes] = await Promise.all([
@@ -74,15 +114,37 @@ export function Board() {
     return { statusId: ticket.status_id, index }
   }
 
+  function shiftColumn(ticketId, targetId, before) {
+    setTickets((current) => {
+      const ticket = current.find((item) => item.id === ticketId)
+      if (!ticket) return current
+      const column = current
+        .filter((item) => item.status_id === ticket.status_id)
+        .sort((a, b) => a.rank - b.rank)
+      const ranks = column.map((item) => item.rank)
+      const order = column.filter((item) => item.id !== ticketId)
+      let index = targetId
+        ? order.findIndex((item) => item.id === targetId)
+        : column.findIndex((item) => item.id === ticketId) + before
+      if (index < 0) return current
+      if (targetId && !before) index += 1
+      order.splice(index, 0, ticket)
+      const rankOf = new Map(order.map((item, position) => [item.id, ranks[position]]))
+      return current.map((item) => (rankOf.has(item.id) ? { ...item, rank: rankOf.get(item.id) } : item))
+    })
+  }
+
   function reorder(ticketId, direction) {
     return run(`order-${ticketId}`, async () => {
       setError('')
+      shiftColumn(ticketId, null, direction)
       const { error: orderError } = await supabase.rpc('move_ticket', {
         p_ticket_id: ticketId,
         p_direction: direction,
       })
       if (orderError) {
         setError(messageFrom(orderError))
+        load()
         return false
       }
       const ticket = tickets.find((item) => item.id === ticketId)
@@ -97,6 +159,7 @@ export function Board() {
   function place(ticketId, targetId, before) {
     return run(`order-${ticketId}`, async () => {
       setError('')
+      shiftColumn(ticketId, targetId, before)
       const { error: placeError } = await supabase.rpc('place_ticket', {
         p_ticket_id: ticketId,
         p_target_id: targetId,
@@ -104,6 +167,7 @@ export function Board() {
       })
       if (placeError) {
         setError(messageFrom(placeError))
+        load()
         return false
       }
       const landing = landingIndex(ticketId, targetId, before)
@@ -218,6 +282,9 @@ export function Board() {
   function move(ticketId, statusId) {
     return run('move', async () => {
       setError('')
+      setTickets((current) => current.map((item) => (
+        item.id === ticketId ? { ...item, status_id: statusId } : item
+      )))
       const { error: moveError } = await supabase.rpc('set_ticket_progress', {
         p_ticket_id: ticketId,
         p_status_id: statusId,
@@ -225,6 +292,7 @@ export function Board() {
       })
       if (moveError) {
         setError(messageFrom(moveError))
+        load()
         return false
       }
       const ticket = tickets.find((item) => item.id === ticketId)
@@ -289,7 +357,7 @@ export function Board() {
           </form>
         )}
       </div>
-      <div className="board">
+      <div className="board" ref={boardRef}>
         {statuses.map((status) => {
           const columnTickets = tickets.filter((ticket) => ticket.status_id === status.id && matches(ticket))
           const limit = Math.min(shown[status.id] ?? PAGE, columnTickets.length)

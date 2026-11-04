@@ -71,7 +71,7 @@ h2 { font-size: 1.45rem; margin: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .page { animation: none; }
+  .page, .card.is-settling { animation: none; }
   .card { transition: none; }
 }
 

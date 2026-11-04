@@ -89,6 +89,13 @@
 
 .card.is-dragging { opacity: 0.45; }
 
+.card.is-settling { animation: card-settle 0.7s ease-out; }
+
+@keyframes card-settle {
+  from { background: var(--pine-soft); }
+  to { background: var(--panel); }
+}
+
 .card.is-drop-before { box-shadow: inset 0 2px 0 var(--brass); }
 
 .card.is-drop-after { box-shadow: inset 0 -2px 0 var(--brass); }
