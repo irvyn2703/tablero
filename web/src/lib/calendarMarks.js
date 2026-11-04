@@ -31,3 +31,18 @@ export function marksByDay(tickets, events, dayKey) {
   })
   return map
 }
+
+export function groupDayMarks(marks) {
+  const groups = []
+  const byStatus = new Map()
+  marks.forEach((mark) => {
+    let group = byStatus.get(mark.statusName)
+    if (!group) {
+      group = { statusName: mark.statusName, tickets: [] }
+      byStatus.set(mark.statusName, group)
+      groups.push(group)
+    }
+    group.tickets.push(mark)
+  })
+  return groups
+}

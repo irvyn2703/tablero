@@ -66,6 +66,20 @@
 
 .closed-title { overflow-wrap: anywhere; }
 
+.mark-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.35rem;
+}
+
+.mark-keys a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.mark-keys a:hover { text-decoration: underline; text-underline-offset: 0.12em; }
+
 .day.out { opacity: 0.35; }
 
 .bar-row { margin-top: 0.15rem; }

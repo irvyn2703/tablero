@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { marksByDay } from '../lib/calendarMarks'
+import { groupDayMarks, marksByDay } from '../lib/calendarMarks'
 import { canEdit, formatProgress, memberName, messageFrom, ticketKey } from '../lib/format'
 import { Alert, Progress, TicketChips } from '../components/ui'
 
@@ -117,21 +117,25 @@ export function Calendar() {
                 <div key={key} className={day.getMonth() === cursor.month ? 'day' : 'day out'}>
                   <span>{day.getDate()}</span>
                   <div className="marks">
-                    {(marks.get(key) ?? []).map((mark) => {
-                      const percent = formatProgress(mark.percent)
-                      const name = ticketKey(company.ticket_prefix, mark.public_number)
+                    {groupDayMarks(marks.get(key) ?? []).map((group) => {
+                      const percents = group.tickets.map((mark) => formatProgress(mark.percent))
+                      const shared = percents.every((percent) => percent === percents[0])
+                      const closed = group.tickets.every((mark) => Number(mark.percent) >= 100)
                       return (
-                        <Link
-                          key={`${mark.id}-${mark.statusName}`}
-                          className={Number(mark.percent) >= 100 ? 'mark closed' : 'mark moved'}
-                          to={`../t/${mark.id}`}
-                        >
+                        <div key={group.statusName} className={closed ? 'mark closed' : 'mark moved'}>
                           <span className="mark-line">
-                            <span className="closed-key">{name}</span>
-                            <span className="closed-percent">{percent}%</span>
+                            <span className="closed-title">{group.statusName}</span>
+                            {shared && <span className="closed-percent">{percents[0]}%</span>}
                           </span>
-                          <span className="closed-title">{mark.statusName}</span>
-                        </Link>
+                          <span className="mark-keys">
+                            {group.tickets.map((mark) => (
+                              <Link key={mark.id} to={`../t/${mark.id}`}>
+                                {ticketKey(company.ticket_prefix, mark.public_number)}
+                                {!shared && ` ${formatProgress(mark.percent)}%`}
+                              </Link>
+                            ))}
+                          </span>
+                        </div>
                       )
                     })}
                   </div>
@@ -173,7 +177,9 @@ export function Calendar() {
                             <span className="closed-key">{ticketKey(company.ticket_prefix, ticket.public_number)}</span>
                             <span className="sprint-copy">
                               <span className="sprint-title">{ticket.title}</span>
-                              {finished(ticket) && <span className="quiet">Completo · {assigneeOf(ticket)}</span>}
+                              <span className="quiet">
+                                {finished(ticket) ? `Completo · ${assigneeOf(ticket)}` : assigneeOf(ticket)}
+                              </span>
                             </span>
                           </Link>
                           <TicketChips priority={ticket.priority} estimate={ticket.estimate} />
