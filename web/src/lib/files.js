@@ -3,7 +3,7 @@ import { messageFrom } from './format'
 
 export const fileLimit = 8
 export const fileBytes = 10 * 1024 * 1024
-const allowed = /\.(jpe?g|png|gif|webp|xls|xlsx|doc|docx)$/i
+const allowed = /\.(jpe?g|png|gif|webp|xls|xlsx|doc|docx|html?)$/i
 
 export function fileSize(bytes) {
   const n = Number(bytes) || 0
@@ -21,7 +21,7 @@ export function takeFiles(current, incoming) {
       break
     }
     if (!allowed.test(file.name) || file.name.includes('/') || file.name.includes('\\')) {
-      error = 'Solo imágenes, Excel o Word.'
+      error = 'Solo imágenes, Excel, Word o HTML.'
       continue
     }
     if (file.size > fileBytes) {

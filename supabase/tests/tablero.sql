@@ -1,6 +1,6 @@
 begin;
 
-select plan(38);
+select plan(39);
 
 insert into public.companies (name, slug)
 values ('Acme', 'acme')
@@ -368,6 +368,7 @@ select is(
 
 select is(private.file_mime('foto.PNG'), 'image/png', 'una imagen png');
 select is(private.file_mime('virus.exe'), null::text, 'un exe no es un archivo del ticket');
+select is(private.file_mime('pagina.HTML'), 'text/html', 'un html del ticket');
 
 select * from finish();
 

@@ -1,6 +1,6 @@
 import { fileSize } from '../lib/files'
 
-const accept = '.jpg,.jpeg,.png,.gif,.webp,.xls,.xlsx,.doc,.docx,image/jpeg,image/png,image/gif,image/webp'
+const accept = '.jpg,.jpeg,.png,.gif,.webp,.xls,.xlsx,.doc,.docx,.htm,.html,image/jpeg,image/png,image/gif,image/webp,text/html'
 
 export function FilePicker({ files, onPick, onRemove, disabled }) {
   return (
@@ -19,7 +19,7 @@ export function FilePicker({ files, onPick, onRemove, disabled }) {
           }}
         />
       </label>
-      <p className="quiet">Imágenes, Excel o Word. Hasta 8 archivos, de 10 MB.</p>
+      <p className="quiet">Imágenes, Excel, Word o HTML. Hasta 8 archivos, de 10 MB.</p>
       {files.length > 0 && (
         <ul className="file-list">
           {files.map((file, index) => (
