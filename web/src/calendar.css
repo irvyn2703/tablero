@@ -20,6 +20,7 @@
   align-items: flex-start;
   gap: 0.28rem;
   min-width: 0;
+  overflow: hidden;
 }
 
 .day > span:first-child {
@@ -49,8 +50,11 @@
 
 .mark-line {
   display: flex;
-  gap: 0.3rem;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.3rem;
   align-items: baseline;
+  width: 100%;
+  min-width: 0;
 }
 
 .day .closed { color: var(--brass); }
@@ -60,11 +64,16 @@
 .closed-key { font-weight: 700; }
 
 .closed-percent {
+  flex: none;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
 }
 
-.closed-title { overflow-wrap: anywhere; }
+.closed-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 
 .mark-keys {
   display: flex;
