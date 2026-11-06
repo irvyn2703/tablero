@@ -206,7 +206,10 @@ export function Ticket() {
 
   return (
     <section className="page">
-      <p className="kicker"><Link to={`/e/${companyId}`}>{company.name}</Link></p>
+      <p className="brand-name">
+        {logoUrl && <img className="report-logo" src={logoUrl} alt="" />}
+        <Link className="kicker" to={`/e/${companyId}`}>{company.name}</Link>
+      </p>
       <div className="row">
         <h1>{ticketKey(company.ticket_prefix, ticket.public_number)} {ticket.title}</h1>
         <div className="cluster">
@@ -235,7 +238,6 @@ export function Ticket() {
       <Progress value={ticket.progress} />
       <Alert>{error}</Alert>
       <form onSubmit={saveFields} className="panel" style={{ marginTop: '1rem' }}>
-        {logoUrl && <img className="report-logo" src={logoUrl} alt="" />}
         <div className="grid-2">
           <label className="field">
             <span>Título</span>

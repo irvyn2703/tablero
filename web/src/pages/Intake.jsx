@@ -25,6 +25,7 @@ const forms = {
       ['want', 'Qué quieres que se pueda hacer', true],
       ['why', 'Por qué hace falta', false],
       ['how', 'Cómo lo imaginas', false],
+      ['needWhere', 'Dónde lo necesitas', false],
       ['who', 'A quién le serviría', false],
     ],
   },
@@ -57,6 +58,7 @@ export function Intake() {
     why: '',
     how: '',
     who: '',
+    needWhere: '',
   })
   const [email, setEmail] = useState('')
   const [files, setFiles] = useState([])
@@ -146,14 +148,16 @@ export function Intake() {
 
   return (
     <main className="letter page">
-      <p className="kicker">{heading.companyName || 'Tablero'}</p>
+      <p className="brand-name">
+        {logoUrl && <img className="report-logo" src={logoUrl} alt="" />}
+        <span className="kicker">{heading.companyName || 'Tablero'}</span>
+      </p>
       <h1>{heading.label || 'Nuevo ticket'}</h1>
       <p className="quiet">{forms[kind].intro}</p>
       <Alert>{error}</Alert>
       <Secret label="Tu liga de seguimiento" value={link} copyLabel="Copiar liga" />
       {!link && (
         <form onSubmit={submit}>
-          {logoUrl && <img className="report-logo" src={logoUrl} alt="" />}
           <KindChoice value={kind} onChange={setKind} />
           <label className="field">
             <span>Título</span>

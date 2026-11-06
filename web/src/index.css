@@ -149,12 +149,21 @@ h2 { font-size: 1.45rem; margin: 0; }
   color: var(--ink);
 }
 
+.brand-name {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0 0 0.85rem;
+}
+
+.brand-name .kicker { margin: 0; }
+
 .report-logo {
   display: block;
-  height: 2.6rem;
+  height: 1.8rem;
   width: auto;
-  max-width: 11rem;
-  margin: 0 0 1rem;
+  max-width: 7rem;
+  margin: 0;
   object-fit: contain;
 }
 

@@ -73,12 +73,14 @@ export function NewTicket() {
 
   return (
     <section className="page">
-      <p className="kicker"><Link to={`/e/${companyId}`}>Tablero</Link></p>
+      <p className="brand-name">
+        {logoUrl && <img className="report-logo" src={logoUrl} alt="" />}
+        <Link className="kicker" to={`/e/${companyId}`}>{company.name}</Link>
+      </p>
       <h1>Nuevo ticket</h1>
       <Alert>{error}</Alert>
       <Secret label="Liga de seguimiento" value={secret} copyLabel="Copiar liga" />
       <form className="panel" onSubmit={createTicket} style={{ marginTop: '1rem', maxWidth: '36rem' }}>
-        {logoUrl && <img className="report-logo" src={logoUrl} alt="" />}
         <KindChoice value={kind} onChange={setKind} />
         <label className="field">
           <span>Título</span>
