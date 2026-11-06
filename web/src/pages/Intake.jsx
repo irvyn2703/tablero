@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { absolutePath, configured, supabase } from '../lib/supabase'
-import { kindName, messageFrom } from '../lib/format'
+import { brandVars, kindName, messageFrom } from '../lib/format'
+import { useLogoUrl } from '../lib/logo'
 import { takeFiles, uploadTicketFiles } from '../lib/files'
 import { FilePicker } from '../components/Files'
 import { ActionButton, Alert, KindChoice, Secret, useFeedback } from '../components/ui'
@@ -63,6 +64,20 @@ export function Intake() {
   const [link, setLink] = useState('')
   const [error, setError] = useState('')
   const { busy, run } = useFeedback()
+  const logoUrl = useLogoUrl(heading?.logoPath)
+
+  useEffect(() => {
+    const root = document.documentElement
+    const style = brandVars({
+      brand_color: heading?.brandColor,
+      accent_color: heading?.accentColor,
+      background_color: heading?.backgroundColor,
+    })
+    for (const [key, value] of Object.entries(style)) root.style.setProperty(key, value)
+    return () => {
+      for (const key of Object.keys(style)) root.style.removeProperty(key)
+    }
+  }, [heading])
 
   useEffect(() => {
     if (!supabase) return
@@ -121,6 +136,7 @@ export function Intake() {
 
   return (
     <main className="letter page">
+      {logoUrl && <img className="report-logo" src={logoUrl} alt="" />}
       <p className="kicker">{heading?.companyName || 'Tablero'}</p>
       <h1>{heading?.label || 'Nuevo ticket'}</h1>
       <p className="quiet">{forms[kind].intro}</p>

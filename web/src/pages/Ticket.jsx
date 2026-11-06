@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { absolutePath, supabase } from '../lib/supabase'
 import { autonomyLabel, canEdit, estimateLabel, formatWhen, memberName, messageFrom, priorityLabel, ticketKey } from '../lib/format'
 import { discardTicket, openTicketFile, takeFiles, uploadTicketFiles } from '../lib/files'
 import { FilePicker, SavedFiles } from '../components/Files'
 import { Thread } from '../components/Thread'
-import { ActionButton, Alert, Done, Progress, TicketChips, useFeedback } from '../components/ui'
+import { ActionButton, Alert, Done, Progress, Secret, TicketChips, useFeedback, writeClipboard } from '../components/ui'
 
 export function Ticket() {
   const navigate = useNavigate()
@@ -27,9 +27,11 @@ export function Ticket() {
   const [savedFiles, setSavedFiles] = useState([])
   const [picked, setPicked] = useState([])
   const [error, setError] = useState('')
+  const [tracking, setTracking] = useState(null)
   const { busy, done, mark, run } = useFeedback()
 
   async function load() {
+    setTracking(null)
     const [ticketRes, statusRes, memberRes, sprintRes, versionRes, repoRes, linkRes, categoryRes, categoryLinkRes, eventRes, messageRes, pullRes, fileRes] = await Promise.all([
       supabase.from('ticket_rows').select('*').eq('id', ticketId).maybeSingle(),
       supabase.from('statuses').select('id, name, allows_delete').eq('company_id', companyId).order('position'),
@@ -85,6 +87,20 @@ export function Ticket() {
       }
       navigate(`/e/${companyId}`)
     }, 'Ticket eliminado.')
+  }
+
+  function copyTracking() {
+    return run('tracking', async () => {
+      setError('')
+      const { data, error: linkError } = await supabase.rpc('tracking_link', { p_ticket_id: ticketId })
+      if (linkError || !data?.token) {
+        setError(messageFrom(linkError))
+        return false
+      }
+      const url = absolutePath(`/t/${data.token}`)
+      setTracking({ url, renewed: Boolean(data.renewed) })
+      await writeClipboard(url)
+    }, 'Liga copiada.')
   }
 
   function sendMessage(body) {
@@ -187,12 +203,26 @@ export function Ticket() {
       <p className="kicker"><Link to={`/e/${companyId}`}>{company.name}</Link></p>
       <div className="row">
         <h1>{ticketKey(company.ticket_prefix, ticket.public_number)} {ticket.title}</h1>
-        {editable && statuses.some((status) => status.id === ticket.status_id && status.allows_delete) && (
-          <button className="btn danger" type="button" disabled={Boolean(busy)} onClick={discard}>
-            Eliminar
-          </button>
-        )}
+        <div className="cluster">
+          <ActionButton name="tracking" busy={busy} pending="Copiando…" className="btn quiet" type="button" onClick={copyTracking}>
+            Copiar liga de seguimiento
+          </ActionButton>
+          {editable && statuses.some((status) => status.id === ticket.status_id && status.allows_delete) && (
+            <button className="btn danger" type="button" disabled={Boolean(busy)} onClick={discard}>
+              Eliminar
+            </button>
+          )}
+        </div>
       </div>
+      <Secret
+        label="Liga de seguimiento"
+        value={tracking?.url || ''}
+        copyLabel="Copiar liga"
+        hint={tracking?.renewed
+          ? 'La liga anterior ya no abre. Comparte esta.'
+          : 'Es la misma liga de cuando se reportó.'}
+      />
+      <Done name="tracking" mark={mark}>{done}</Done>
       <TicketChips priority={ticket.priority} estimate={ticket.estimate} />
       <Progress value={ticket.progress} />
       <Alert>{error}</Alert>

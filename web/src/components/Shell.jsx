@@ -67,7 +67,7 @@ export function Shell() {
     let alive = true
     supabase
       .from('company_members')
-      .select('role, companies(id, name, slug, policy, ticket_prefix, brand_color, accent_color, logo_path)')
+      .select('role, companies(id, name, slug, policy, ticket_prefix, brand_color, accent_color, background_color, logo_path)')
       .eq('company_id', companyId)
       .eq('user_id', session.user.id)
       .maybeSingle()

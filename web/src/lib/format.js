@@ -102,11 +102,13 @@ export function laneVars(value) {
 
 export const builtInPine = '#1c3d34'
 export const builtInBrass = '#8d6b3a'
+export const builtInPaper = '#f4f1ea'
 
 export function brandVars(company) {
   const style = {}
   const pine = String(company?.brand_color || '').trim().toLowerCase()
   const brass = String(company?.accent_color || '').trim().toLowerCase()
+  const paper = String(company?.background_color || '').trim().toLowerCase()
   if (/^#[0-9a-f]{6}$/.test(pine)) {
     style['--pine'] = pine
     style['--pine-soft'] = `color-mix(in srgb, ${pine} 14%, var(--paper))`
@@ -114,6 +116,11 @@ export function brandVars(company) {
   }
   if (/^#[0-9a-f]{6}$/.test(brass)) {
     style['--brass'] = brass
+  }
+  if (/^#[0-9a-f]{6}$/.test(paper)) {
+    style['--paper'] = paper
+    style['--paper-deep'] = `color-mix(in srgb, ${paper} 82%, ${inkOn(paper)})`
+    style['--ink'] = inkOn(paper)
   }
   return style
 }

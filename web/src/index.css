@@ -138,6 +138,26 @@ h2 { font-size: 1.45rem; margin: 0; }
   font-weight: 700;
 }
 
+.brand-preview {
+  margin-top: 0.8rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--brass) 8%, transparent), transparent 4rem),
+    var(--paper);
+  color: var(--ink);
+}
+
+.report-logo {
+  display: block;
+  height: 2.6rem;
+  width: auto;
+  max-width: 11rem;
+  margin: 0 0 1rem;
+  object-fit: contain;
+}
+
 .mark div { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
 
 .mark strong {
@@ -887,7 +907,7 @@ h2 { font-size: 1.45rem; margin: 0; }
   .switch input { width: 3.2rem; height: 2rem; }
   .switch input::after { width: 1.45rem; height: 1.45rem; }
   .switch input:checked::after { left: calc(100% - 1.6rem); }
-  .grid-2, .kinds, .list article.member-row { grid-template-columns: 1fr; }
+  .grid-2, .grid-3, .kinds, .list article.member-row { grid-template-columns: 1fr; }
   .list article.member-row { width: 100%; }
   .member-side { flex-wrap: wrap; }
   .row, .secret-row { align-items: stretch; flex-direction: column; }

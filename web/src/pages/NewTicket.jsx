@@ -3,12 +3,14 @@ import { Link, useOutletContext, useParams } from 'react-router-dom'
 import { absolutePath, supabase } from '../lib/supabase'
 import { canEdit, kindName, messageFrom } from '../lib/format'
 import { takeFiles, uploadTicketFiles } from '../lib/files'
+import { useLogoUrl } from '../lib/logo'
 import { FilePicker } from '../components/Files'
 import { ActionButton, Alert, Done, KindChoice, Secret, useFeedback } from '../components/ui'
 
 export function NewTicket() {
   const { companyId } = useParams()
-  const { role } = useOutletContext()
+  const { company, role } = useOutletContext()
+  const logoUrl = useLogoUrl(company?.logo_path)
   const [kind, setKind] = useState('ticket')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -72,6 +74,7 @@ export function NewTicket() {
   return (
     <section className="page">
       <p className="kicker"><Link to={`/e/${companyId}`}>Tablero</Link></p>
+      {logoUrl && <img className="report-logo" src={logoUrl} alt="" />}
       <h1>Nuevo ticket</h1>
       <Alert>{error}</Alert>
       <Secret label="Liga de seguimiento" value={secret} copyLabel="Copiar liga" />

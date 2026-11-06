@@ -32,7 +32,7 @@ export function Companies() {
   async function load() {
     const { data, error: loadError } = await supabase
       .from('company_members')
-      .select('role, companies(id, name, slug, logo_path, brand_color, accent_color)')
+      .select('role, companies(id, name, slug, logo_path, brand_color, accent_color, background_color)')
       .eq('user_id', session.user.id)
     if (loadError) setError(messageFrom(loadError))
     else setRows(data ?? [])
