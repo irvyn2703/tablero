@@ -17,6 +17,7 @@ export function Board() {
   const [draggingId, setDraggingId] = useState('')
   const [drop, setDrop] = useState(null)
   const [shown, setShown] = useState({})
+  const [versions, setVersions] = useState([])
   const [categories, setCategories] = useState([])
   const [links, setLinks] = useState([])
   const [pickedCats, setPickedCats] = useState([])
@@ -65,19 +66,21 @@ export function Board() {
   })
 
   async function load() {
-    const [statusRes, ticketRes, categoryRes, linkRes] = await Promise.all([
+    const [statusRes, ticketRes, versionRes, categoryRes, linkRes] = await Promise.all([
       supabase.from('statuses').select('id, name, kind, position, weight, color, allows_delete').eq('company_id', companyId).order('position'),
-      supabase.from('ticket_rows').select('id, public_number, title, status_id, progress, local_percent, priority, estimate, rank').eq('company_id', companyId).order('rank'),
+      supabase.from('ticket_rows').select('id, public_number, title, status_id, progress, local_percent, priority, estimate, rank, version_id').eq('company_id', companyId).order('rank'),
+      supabase.from('versions').select('id, name').eq('company_id', companyId),
       supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
       supabase.from('ticket_categories').select('ticket_id, category_id').eq('company_id', companyId),
     ])
-    const failed = [statusRes, ticketRes, categoryRes, linkRes].find((item) => item.error)
+    const failed = [statusRes, ticketRes, versionRes, categoryRes, linkRes].find((item) => item.error)
     if (failed) {
       setError(messageFrom(failed.error))
       return
     }
     setStatuses(statusRes.data ?? [])
     setTickets(ticketRes.data ?? [])
+    setVersions(versionRes.data ?? [])
     setCategories(categoryRes.data ?? [])
     setLinks(linkRes.data ?? [])
   }
@@ -224,6 +227,11 @@ export function Board() {
       }
       load()
     }, 'Ticket eliminado.')
+  }
+
+  function versionOf(ticket) {
+    if (!ticket.version_id) return ''
+    return versions.find((version) => version.id === ticket.version_id)?.name || ''
   }
 
   function categoriesOf(ticketId) {
@@ -416,6 +424,7 @@ export function Board() {
                   )}
                 </div>
                 <Link className="card-body" to={`t/${ticket.id}`}>
+                  {versionOf(ticket) && <span className="card-version">{versionOf(ticket)}</span>}
                   <p>{ticket.title}</p>
                   {categoriesOf(ticket.id).length > 0 && (
                     <span className="card-cats">
