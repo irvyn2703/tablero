@@ -69,6 +69,8 @@ export function ticketKey(prefix, number) {
 
 const darkInk = '#1c1915'
 const lightInk = '#f7f4ee'
+const mutedInk = '#5e584f'
+const minContrast = 4.5
 
 export function hexColor(value) {
   const text = String(value || '').trim().toLowerCase()
@@ -104,6 +106,14 @@ export const builtInPine = '#1c3d34'
 export const builtInBrass = '#8d6b3a'
 export const builtInPaper = '#f4f1ea'
 
+export function paperReads(value) {
+  const paper = String(value || '').trim().toLowerCase()
+  if (!/^#[0-9a-f]{6}$/.test(paper)) return false
+  const background = luminance(paper)
+  return contrast(background, luminance(darkInk)) >= minContrast
+    && contrast(background, luminance(mutedInk)) >= minContrast
+}
+
 export function brandVars(company) {
   const style = {}
   const pine = String(company?.brand_color || '').trim().toLowerCase()
@@ -117,10 +127,9 @@ export function brandVars(company) {
   if (/^#[0-9a-f]{6}$/.test(brass)) {
     style['--brass'] = brass
   }
-  if (/^#[0-9a-f]{6}$/.test(paper)) {
+  if (paperReads(paper)) {
     style['--paper'] = paper
-    style['--paper-deep'] = `color-mix(in srgb, ${paper} 82%, ${inkOn(paper)})`
-    style['--ink'] = inkOn(paper)
+    style['--paper-deep'] = `color-mix(in srgb, ${paper} 82%, ${darkInk})`
   }
   return style
 }

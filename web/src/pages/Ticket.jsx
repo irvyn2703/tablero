@@ -31,7 +31,6 @@ export function Ticket() {
   const { busy, done, mark, run } = useFeedback()
 
   async function load() {
-    setTracking(null)
     const [ticketRes, statusRes, memberRes, sprintRes, versionRes, repoRes, linkRes, categoryRes, categoryLinkRes, eventRes, messageRes, pullRes, fileRes] = await Promise.all([
       supabase.from('ticket_rows').select('*').eq('id', ticketId).maybeSingle(),
       supabase.from('statuses').select('id, name, allows_delete').eq('company_id', companyId).order('position'),
@@ -75,6 +74,8 @@ export function Ticket() {
 
   useEffect(() => { load() }, [ticketId, companyId])
 
+  useEffect(() => { setTracking(null) }, [ticketId])
+
   function discard() {
     const key = ticketKey(company.ticket_prefix, ticket.public_number)
     return run('delete', async () => {
@@ -92,14 +93,17 @@ export function Ticket() {
   function copyTracking() {
     return run('tracking', async () => {
       setError('')
-      const { data, error: linkError } = await supabase.rpc('tracking_link', { p_ticket_id: ticketId })
-      if (linkError || !data?.token) {
-        setError(messageFrom(linkError))
-        return false
+      let next = tracking
+      if (!next?.url) {
+        const { data, error: linkError } = await supabase.rpc('tracking_link', { p_ticket_id: ticketId })
+        if (linkError || !data?.token) {
+          setError(messageFrom(linkError))
+          return false
+        }
+        next = { url: absolutePath(`/t/${data.token}`), renewed: Boolean(data.renewed) }
+        setTracking(next)
       }
-      const url = absolutePath(`/t/${data.token}`)
-      setTracking({ url, renewed: Boolean(data.renewed) })
-      await writeClipboard(url)
+      await writeClipboard(next.url)
     }, 'Liga copiada.')
   }
 
@@ -204,9 +208,11 @@ export function Ticket() {
       <div className="row">
         <h1>{ticketKey(company.ticket_prefix, ticket.public_number)} {ticket.title}</h1>
         <div className="cluster">
-          <ActionButton name="tracking" busy={busy} pending="Copiando…" className="btn quiet" type="button" onClick={copyTracking}>
-            Copiar liga de seguimiento
-          </ActionButton>
+          {editable && (
+            <ActionButton name="tracking" busy={busy} pending="Copiando…" className="btn quiet" type="button" onClick={copyTracking}>
+              Copiar liga de seguimiento
+            </ActionButton>
+          )}
           {editable && statuses.some((status) => status.id === ticket.status_id && status.allows_delete) && (
             <button className="btn danger" type="button" disabled={Boolean(busy)} onClick={discard}>
               Eliminar

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { brandVars, builtInBrass, builtInPaper, builtInPine, isAdmin, messageFrom } from '../lib/format'
+import { brandVars, builtInBrass, builtInPaper, builtInPine, isAdmin, messageFrom, paperReads } from '../lib/format'
 import { ActionButton, Alert, Done, useFeedback } from '../components/ui'
 
 const logoTypes = /^image\/(jpeg|png|webp|gif)$/
@@ -42,7 +42,8 @@ export function Brand() {
       setError('')
       const brand_color = pine.toLowerCase() === builtInPine ? '' : pine.toLowerCase()
       const accent_color = brass.toLowerCase() === builtInBrass ? '' : brass.toLowerCase()
-      const background_color = paper.toLowerCase() === builtInPaper ? '' : paper.toLowerCase()
+      const chosen = paper.toLowerCase()
+      const background_color = chosen === builtInPaper || !paperReads(chosen) ? '' : chosen
       const { error: updateError } = await supabase
         .from('companies')
         .update({ brand_color, accent_color, background_color })
@@ -125,7 +126,7 @@ export function Brand() {
   const preview = brandVars({
     brand_color: pine.toLowerCase() === builtInPine ? '' : pine,
     accent_color: brass.toLowerCase() === builtInBrass ? '' : brass,
-    background_color: paper.toLowerCase() === builtInPaper ? '' : paper,
+    background_color: paper.toLowerCase() === builtInPaper || !paperReads(paper) ? '' : paper,
   })
 
   return (
@@ -150,6 +151,9 @@ export function Brand() {
           </label>
         </div>
         <p className="quiet">El principal pinta los botones. El acento pinta las marcas. El fondo pinta la página y el formulario para reportar.</p>
+        {paper.toLowerCase() !== builtInPaper && !paperReads(paper) && (
+          <p className="quiet">Ese fondo no se aplica: el texto dejaría de leerse.</p>
+        )}
         <div className="brand-preview cluster" style={preview}>
           <span className="btn">Así se ve</span>
           <span className="brand-swatch">Acento</span>
