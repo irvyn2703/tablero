@@ -31,7 +31,7 @@ html, body, #root { min-height: 100%; }
 body {
   margin: 0;
   background:
-    linear-gradient(180deg, rgba(141, 107, 58, 0.05), transparent 12rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--brass) 5%, transparent), transparent 12rem),
     var(--paper);
 }
 
@@ -101,13 +101,41 @@ h2 { font-size: 1.45rem; margin: 0; }
   text-decoration: none;
 }
 
-.mark i {
+.mark i,
+.mark-logo,
+.brand-mark,
+.brand-logo {
   width: 1.7rem;
   height: 1.7rem;
+  flex: none;
+}
+
+.mark i,
+.brand-mark {
   background:
     linear-gradient(var(--paper), var(--paper)) center / 3px 70% no-repeat,
     var(--pine);
-  flex: none;
+}
+
+.mark-logo,
+.brand-logo {
+  object-fit: contain;
+  background: var(--paper);
+}
+
+.brand-logo,
+.brand-mark { width: 3.2rem; height: 3.2rem; }
+
+.brand-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 0.8rem;
+}
+
+.brand-swatch {
+  color: var(--brass);
+  font-weight: 700;
 }
 
 .mark div { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
@@ -193,7 +221,7 @@ h2 { font-size: 1.45rem; margin: 0; }
 .btn {
   padding: 0.55rem 0.9rem;
   background: var(--pine);
-  color: #f7f4ee;
+  color: var(--on-pine, #f7f4ee);
   border-color: var(--pine);
   text-decoration: none;
 }
@@ -721,6 +749,12 @@ h2 { font-size: 1.45rem; margin: 0; }
 .company-card:hover { border-color: var(--pine); }
 
 .company-card strong { font-family: var(--serif); font-size: 1.6rem; font-weight: 500; }
+
+.company-logo {
+  width: 2.2rem;
+  height: 2.2rem;
+  object-fit: contain;
+}
 
 .letter {
   max-width: 40rem;

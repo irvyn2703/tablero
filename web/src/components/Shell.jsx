@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { isAdmin } from '../lib/format'
+import { brandVars, isAdmin } from '../lib/format'
 import { ActionButton, Alert, useFeedback } from './ui'
 
 const links = [
@@ -16,6 +16,7 @@ const adminLinks = [
   ['repos', 'Repos'],
   ['ligas', 'Ligas'],
   ['automatizacion', 'Automatización'],
+  ['diseno', 'Diseño'],
 ]
 
 export function Shell() {
@@ -26,10 +27,32 @@ export function Shell() {
   const [role, setRole] = useState('')
   const [error, setError] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [logoUrl, setLogoUrl] = useState('')
   const { pathname } = useLocation()
   const { busy, run } = useFeedback()
 
   useEffect(() => { setMenuOpen(false) }, [pathname])
+
+  useEffect(() => {
+    const root = document.documentElement
+    const style = brandVars(company)
+    for (const [key, value] of Object.entries(style)) root.style.setProperty(key, value)
+    return () => {
+      for (const key of Object.keys(style)) root.style.removeProperty(key)
+    }
+  }, [company])
+
+  useEffect(() => {
+    if (!company?.logo_path) {
+      setLogoUrl('')
+      return undefined
+    }
+    let alive = true
+    supabase.storage.from('company-logos').createSignedUrl(company.logo_path, 3600).then(({ data }) => {
+      if (alive) setLogoUrl(data?.signedUrl || '')
+    })
+    return () => { alive = false }
+  }, [company?.logo_path])
 
   useEffect(() => {
     if (!menuOpen) return undefined
@@ -44,7 +67,7 @@ export function Shell() {
     let alive = true
     supabase
       .from('company_members')
-      .select('role, companies(id, name, slug, policy, ticket_prefix)')
+      .select('role, companies(id, name, slug, policy, ticket_prefix, brand_color, accent_color, logo_path)')
       .eq('company_id', companyId)
       .eq('user_id', session.user.id)
       .maybeSingle()
@@ -81,7 +104,7 @@ export function Shell() {
       {menuOpen && <button className="menu-shade" type="button" aria-label="Cerrar menú" onClick={() => setMenuOpen(false)} />}
       <aside className={menuOpen ? 'rail is-open' : 'rail'}>
         <NavLink to="/" className="mark">
-          <i aria-hidden="true" />
+          {logoUrl ? <img className="mark-logo" src={logoUrl} alt="" /> : <i aria-hidden="true" />}
           <div>
             <strong>Tablero</strong>
             <span>{company.name}</span>

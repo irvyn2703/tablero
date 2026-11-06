@@ -100,6 +100,24 @@ export function laneVars(value) {
   return { '--lane': background, '--lane-ink': inkOn(background) }
 }
 
+export const builtInPine = '#1c3d34'
+export const builtInBrass = '#8d6b3a'
+
+export function brandVars(company) {
+  const style = {}
+  const pine = String(company?.brand_color || '').trim().toLowerCase()
+  const brass = String(company?.accent_color || '').trim().toLowerCase()
+  if (/^#[0-9a-f]{6}$/.test(pine)) {
+    style['--pine'] = pine
+    style['--pine-soft'] = `color-mix(in srgb, ${pine} 14%, var(--paper))`
+    style['--on-pine'] = inkOn(pine)
+  }
+  if (/^#[0-9a-f]{6}$/.test(brass)) {
+    style['--brass'] = brass
+  }
+  return style
+}
+
 export function messageFrom(error) {
   if (!error) return 'No se pudo completar.'
   const text = error.message || String(error)

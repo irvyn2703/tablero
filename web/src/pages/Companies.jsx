@@ -1,8 +1,24 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { messageFrom, roleLabel } from '../lib/format'
+import { brandVars, messageFrom, roleLabel } from '../lib/format'
 import { ActionButton, Alert, useFeedback } from '../components/ui'
+
+function CompanyLogo({ path }) {
+  const [url, setUrl] = useState('')
+
+  useEffect(() => {
+    if (!path) return undefined
+    let alive = true
+    supabase.storage.from('company-logos').createSignedUrl(path, 3600).then(({ data }) => {
+      if (alive) setUrl(data?.signedUrl || '')
+    })
+    return () => { alive = false }
+  }, [path])
+
+  if (!url) return null
+  return <img className="company-logo" src={url} alt="" />
+}
 
 export function Companies() {
   const { session } = useOutletContext()
@@ -16,7 +32,7 @@ export function Companies() {
   async function load() {
     const { data, error: loadError } = await supabase
       .from('company_members')
-      .select('role, companies(id, name, slug)')
+      .select('role, companies(id, name, slug, logo_path, brand_color, accent_color)')
       .eq('user_id', session.user.id)
     if (loadError) setError(messageFrom(loadError))
     else setRows(data ?? [])
@@ -61,7 +77,8 @@ export function Companies() {
       <Alert>{error}</Alert>
       <div className="companies">
         {rows.map((row) => (
-          <Link key={row.companies.id} className="company-card" to={`/e/${row.companies.id}`}>
+          <Link key={row.companies.id} className="company-card" to={`/e/${row.companies.id}`} style={brandVars(row.companies)}>
+            <CompanyLogo path={row.companies.logo_path} />
             <strong>{row.companies.name}</strong>
             <span className="quiet">{roleLabel[row.role]}</span>
           </Link>

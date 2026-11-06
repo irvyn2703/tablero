@@ -15,6 +15,7 @@ import { Members } from './pages/Members'
 import { Repos } from './pages/Repos'
 import { Links } from './pages/Links'
 import { Automation } from './pages/Automation'
+import { Brand } from './pages/Brand'
 import { Intake } from './pages/Intake'
 import { Track } from './pages/Track'
 import { Join } from './pages/Join'
@@ -70,6 +71,7 @@ export function App() {
             <Route path="repos" element={<Repos />} />
             <Route path="ligas" element={<Links />} />
             <Route path="automatizacion" element={<Automation />} />
+            <Route path="diseno" element={<Brand />} />
           </Route>
         </Route>
       </Routes>
