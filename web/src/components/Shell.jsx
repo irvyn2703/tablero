@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { brandVars, isAdmin } from '../lib/format'
@@ -33,7 +33,7 @@ export function Shell() {
 
   useEffect(() => { setMenuOpen(false) }, [pathname])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = document.documentElement
     const style = brandVars(company)
     for (const [key, value] of Object.entries(style)) root.style.setProperty(key, value)

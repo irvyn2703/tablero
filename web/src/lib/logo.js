@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 
+export function logoPublicUrl(path) {
+  if (!path || !supabase) return ''
+  return supabase.storage.from('company-logos').getPublicUrl(path).data.publicUrl
+}
+
 export function useLogoUrl(path) {
   const [url, setUrl] = useState('')
 

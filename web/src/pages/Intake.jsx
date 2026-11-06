@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { absolutePath, configured, supabase } from '../lib/supabase'
 import { brandVars, kindName, messageFrom } from '../lib/format'
+import { logoPublicUrl } from '../lib/logo'
 import { takeFiles, uploadTicketFiles } from '../lib/files'
 import { FilePicker } from '../components/Files'
 import { ActionButton, Alert, KindChoice, Secret, useFeedback } from '../components/ui'
@@ -64,12 +65,13 @@ export function Intake() {
   const [error, setError] = useState('')
   const { busy, run } = useFeedback()
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (!heading) return undefined
     const root = document.documentElement
     const style = brandVars({
-      brand_color: heading?.brandColor,
-      accent_color: heading?.accentColor,
-      background_color: heading?.backgroundColor,
+      brand_color: heading.brandColor,
+      accent_color: heading.accentColor,
+      background_color: heading.backgroundColor,
     })
     for (const [key, value] of Object.entries(style)) root.style.setProperty(key, value)
     return () => {
@@ -80,7 +82,7 @@ export function Intake() {
   useEffect(() => {
     if (!supabase) return
     supabase.rpc('read_intake', { p_token: token }).then(({ data, error: readError }) => {
-      if (readError) setError(messageFrom(readError))
+      if (readError || !data) setError(readError ? messageFrom(readError) : 'No se encontró la liga.')
       else setHeading(data)
     })
   }, [token])
@@ -131,16 +133,27 @@ export function Intake() {
   }
 
   if (!configured) return <main className="letter"><h1>Falta configurar Supabase.</h1></main>
+  if (!heading) {
+    return (
+      <main className="letter">
+        <Alert>{error}</Alert>
+        {!error && <p className="quiet">Un momento.</p>}
+      </main>
+    )
+  }
+
+  const logoUrl = logoPublicUrl(heading.logoPath)
 
   return (
     <main className="letter page">
-      <p className="kicker">{heading?.companyName || 'Tablero'}</p>
-      <h1>{heading?.label || 'Nuevo ticket'}</h1>
+      <p className="kicker">{heading.companyName || 'Tablero'}</p>
+      <h1>{heading.label || 'Nuevo ticket'}</h1>
       <p className="quiet">{forms[kind].intro}</p>
       <Alert>{error}</Alert>
       <Secret label="Tu liga de seguimiento" value={link} copyLabel="Copiar liga" />
       {!link && (
         <form onSubmit={submit}>
+          {logoUrl && <img className="report-logo" src={logoUrl} alt="" />}
           <KindChoice value={kind} onChange={setKind} />
           <label className="field">
             <span>Título</span>

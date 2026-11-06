@@ -3,6 +3,7 @@ import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom
 import { absolutePath, supabase } from '../lib/supabase'
 import { autonomyLabel, canEdit, estimateLabel, formatWhen, memberName, messageFrom, priorityLabel, ticketKey } from '../lib/format'
 import { discardTicket, openTicketFile, takeFiles, uploadTicketFiles } from '../lib/files'
+import { useLogoUrl } from '../lib/logo'
 import { FilePicker, SavedFiles } from '../components/Files'
 import { Thread } from '../components/Thread'
 import { ActionButton, Alert, Done, Progress, Secret, TicketChips, useFeedback, writeClipboard } from '../components/ui'
@@ -11,6 +12,7 @@ export function Ticket() {
   const navigate = useNavigate()
   const { companyId, ticketId } = useParams()
   const { company, role } = useOutletContext()
+  const logoUrl = useLogoUrl(company?.logo_path)
   const editable = canEdit(role)
   const [ticket, setTicket] = useState(null)
   const [statuses, setStatuses] = useState([])
@@ -233,6 +235,7 @@ export function Ticket() {
       <Progress value={ticket.progress} />
       <Alert>{error}</Alert>
       <form onSubmit={saveFields} className="panel" style={{ marginTop: '1rem' }}>
+        {logoUrl && <img className="report-logo" src={logoUrl} alt="" />}
         <div className="grid-2">
           <label className="field">
             <span>Título</span>
