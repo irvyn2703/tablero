@@ -12,30 +12,44 @@ export function SprintForm() {
   const [name, setName] = useState('')
   const [starts, setStarts] = useState('')
   const [ends, setEnds] = useState('')
-  const [ready, setReady] = useState(!sprintId)
+  const [objectiveId, setObjectiveId] = useState('')
+  const [objectiveName, setObjectiveName] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [objectives, setObjectives] = useState([])
+  const [categories, setCategories] = useState([])
+  const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
   const { busy, run } = useFeedback()
 
   useEffect(() => {
-    if (!sprintId) return undefined
     let alive = true
-    supabase
-      .from('sprints')
-      .select('id, name, starts_on, ends_on')
-      .eq('id', sprintId)
-      .eq('company_id', companyId)
-      .maybeSingle()
-      .then(({ data, error: loadError }) => {
-        if (!alive) return
-        if (loadError || !data) {
-          setError(loadError ? messageFrom(loadError) : 'No está ese sprint.')
-          return
-        }
-        setName(data.name)
-        setStarts(data.starts_on)
-        setEnds(data.ends_on)
-        setReady(true)
-      })
+    Promise.all([
+      supabase.from('objectives').select('id, name').eq('company_id', companyId).order('name'),
+      supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
+      sprintId
+        ? supabase.from('sprints').select('id, name, starts_on, ends_on, objective_id').eq('id', sprintId).eq('company_id', companyId).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]).then(([objectiveRes, categoryRes, sprintRes]) => {
+      if (!alive) return
+      const failed = [objectiveRes, categoryRes, sprintRes].find((item) => item.error)
+      if (failed) {
+        setError(messageFrom(failed.error))
+        return
+      }
+      if (sprintId && !sprintRes.data) {
+        setError('No está ese sprint.')
+        return
+      }
+      setObjectives(objectiveRes.data ?? [])
+      setCategories(categoryRes.data ?? [])
+      if (sprintRes.data) {
+        setName(sprintRes.data.name)
+        setStarts(sprintRes.data.starts_on)
+        setEnds(sprintRes.data.ends_on)
+        setObjectiveId(sprintRes.data.objective_id || '')
+      }
+      setReady(true)
+    })
     return () => { alive = false }
   }, [companyId, sprintId])
 
@@ -44,7 +58,25 @@ export function SprintForm() {
     const wasEditing = Boolean(sprintId)
     await run('save', async () => {
       setError('')
-      const payload = { name, starts_on: starts, ends_on: ends }
+      let nextObjective = objectiveId || null
+      if (objectiveId === 'new') {
+        const trimmed = objectiveName.trim()
+        if (!trimmed) {
+          setError('El objetivo lleva nombre.')
+          return false
+        }
+        const { data: created, error: objectiveError } = await supabase.from('objectives').insert({
+          company_id: companyId,
+          name: trimmed,
+          category_id: categoryId || null,
+        }).select('id').single()
+        if (objectiveError) {
+          setError(objectiveError.code === '23505' ? 'Ya existe ese objetivo.' : messageFrom(objectiveError))
+          return false
+        }
+        nextObjective = created.id
+      }
+      const payload = { name, starts_on: starts, ends_on: ends, objective_id: nextObjective }
       const query = sprintId
         ? supabase.from('sprints').update(payload).eq('id', sprintId).eq('company_id', companyId)
         : supabase.from('sprints').insert({ ...payload, company_id: companyId })
@@ -104,6 +136,33 @@ export function SprintForm() {
               <span>Fin</span>
               <input type="date" value={ends} onChange={(event) => setEnds(event.target.value)} required />
             </label>
+            <label className="field">
+              <span>Objetivo</span>
+              <select value={objectiveId} onChange={(event) => setObjectiveId(event.target.value)}>
+                <option value="">Sin objetivo</option>
+                {objectives.map((objective) => (
+                  <option key={objective.id} value={objective.id}>{objective.name}</option>
+                ))}
+                <option value="new">Nuevo objetivo</option>
+              </select>
+            </label>
+            {objectiveId === 'new' && (
+              <>
+                <label className="field">
+                  <span>Nombre del objetivo</span>
+                  <input value={objectiveName} onChange={(event) => setObjectiveName(event.target.value)} required />
+                </label>
+                <label className="field">
+                  <span>Categoría</span>
+                  <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+                    <option value="">Sin categoría</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
           </div>
           <div className="cluster" style={{ marginTop: '0.8rem' }}>
             <ActionButton name="save" busy={busy} pending={sprintId ? 'Guardando…' : 'Agregando…'} className="btn" type="submit">

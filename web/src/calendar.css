@@ -100,6 +100,22 @@
 
 .bar-row { margin-top: 0.15rem; }
 
+.objective-head {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  align-items: baseline;
+  margin-top: 0.35rem;
+}
+
+.sprint-buckets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-top: 0.7rem;
+}
+
 .bar {
   background: var(--pine-soft);
   color: var(--pine);
@@ -251,5 +267,6 @@
     grid-template-columns: minmax(0, 1fr);
     row-gap: 0.2rem;
   }
+  .sprint-buckets { grid-template-columns: 1fr; }
   .bar { min-width: 0; padding: 0.2rem 0.3rem; }
 }

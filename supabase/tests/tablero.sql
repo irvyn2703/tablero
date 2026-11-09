@@ -1,6 +1,6 @@
 begin;
 
-select plan(41);
+select plan(44);
 
 insert into public.companies (name, slug)
 values ('Acme', 'acme')
@@ -364,6 +364,46 @@ select is(
   ) ->> 'status'),
   'En cola',
   'el agente pasa el ticket al estado nombrado'
+);
+
+insert into public.sprints (company_id, name, starts_on, ends_on)
+values (:'company_id'::uuid, '10–21 nov', '2026-11-10', '2026-11-21')
+returning id as sprint_a \gset
+
+insert into public.sprints (company_id, name, starts_on, ends_on)
+values (:'company_id'::uuid, '24 nov–5 dic', '2026-11-24', '2026-12-05')
+returning id as sprint_b \gset
+
+update public.tickets
+set sprint_id = :'sprint_a'::uuid
+where id = :'ticket_id'::uuid;
+
+select is(
+  (select outcome from public.ticket_sprint_stays where ticket_id = :'ticket_id'::uuid and sprint_id = :'sprint_a'::uuid),
+  'open',
+  'el sprint en curso queda comprometido'
+);
+
+update public.tickets
+set sprint_id = :'sprint_b'::uuid
+where id = :'ticket_id'::uuid;
+
+select is(
+  (select outcome from public.ticket_sprint_stays where ticket_id = :'ticket_id'::uuid and sprint_id = :'sprint_a'::uuid),
+  'carried',
+  'al pasar de quincena queda en sigue'
+);
+
+select private.apply_progress(
+  :'ticket_id'::uuid,
+  (select id from public.statuses where company_id = :'company_id' and name = 'Listo'),
+  null
+);
+
+select is(
+  (select outcome from public.ticket_sprint_stays where ticket_id = :'ticket_id'::uuid and sprint_id = :'sprint_b'::uuid),
+  'done',
+  'al cerrar el ticket la quincena queda completa'
 );
 
 update public.tickets

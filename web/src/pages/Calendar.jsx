@@ -2,14 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { groupDayMarks, marksByDay } from '../lib/calendarMarks'
-import { canEdit, formatProgress, localDateKey, memberName, messageFrom, ticketKey } from '../lib/format'
+import { canEdit, formatProgress, localDateKey, memberName, messageFrom, sprintSpan, ticketKey } from '../lib/format'
+import { bucketStays, objectiveLanes, sizeLine } from '../lib/sprintStory'
 import { Alert, Progress, TicketChips } from '../components/ui'
 
 const weekday = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
-
-function finished(ticket) {
-  return ticket.status_kind === 'close' || Number(ticket.progress) >= 100
-}
 
 function weeksOf(year, month) {
   const first = new Date(year, month, 1)
@@ -24,6 +21,102 @@ function weeksOf(year, month) {
   ))
 }
 
+function TicketLine({ ticket, company, assigneeOf, hint }) {
+  return (
+    <li>
+      <Link className="sprint-name" to={`../t/${ticket.id}`}>
+        <span className="closed-key">{ticketKey(company.ticket_prefix, ticket.public_number)}</span>
+        <span className="sprint-copy">
+          <span className="sprint-title">{ticket.title}</span>
+          <span className="quiet">{hint || assigneeOf(ticket)}</span>
+        </span>
+      </Link>
+      <TicketChips priority={ticket.priority} estimate={ticket.estimate} />
+      <Progress value={ticket.progress} />
+    </li>
+  )
+}
+
+function Bucket({ title, tickets, company, assigneeOf, hintFor }) {
+  return (
+    <div>
+      <span className="quiet">{title}</span>
+      {tickets.length === 0
+        ? <div className="quiet">—</div>
+        : (
+          <ul className="sprint-tickets">
+            {tickets.map((ticket) => (
+              <TicketLine
+                key={ticket.id}
+                ticket={ticket}
+                company={company}
+                assigneeOf={assigneeOf}
+                hint={hintFor ? hintFor(ticket) : ''}
+              />
+            ))}
+          </ul>
+        )}
+    </div>
+  )
+}
+
+function placeSprint(sprint, days) {
+  let from = -1
+  let to = -1
+  days.forEach((day, index) => {
+    const key = localDateKey(day)
+    if (key >= sprint.starts_on && key <= sprint.ends_on) {
+      if (from < 0) from = index
+      to = index
+    }
+  })
+  if (from < 0) return null
+  return { from, to }
+}
+
+function sprintStartsThisWeek(sprint, weeks, days) {
+  const firstWeek = weeks.find((candidate) => {
+    const start = localDateKey(candidate[0])
+    const end = localDateKey(candidate[6])
+    return sprint.starts_on <= end && sprint.ends_on >= start
+  })
+  return Boolean(firstWeek) && localDateKey(firstWeek[0]) === localDateKey(days[0])
+}
+
+function SprintDetail({ sprint, span, buckets, editable, company, assigneeOf, sprintById }) {
+  const counted = buckets.open.length + buckets.done.length + buckets.carried.length
+  return (
+    <div className="bar-detail">
+      <div className="cluster">
+        <strong>{span || sprint.name}</strong>
+        {editable && <Link className="text-btn" to={`s/${sprint.id}`}>Editar</Link>}
+      </div>
+      <p className="quiet">
+        {`comprometido ${buckets.open.length} · completo ${buckets.done.length} · sigue ${buckets.carried.length}`}
+      </p>
+      {counted === 0
+        ? <div className="quiet">Sin tickets. Asígnale este sprint en la ficha.</div>
+        : (
+          <div className="sprint-buckets">
+            <Bucket title="Comprometido" tickets={buckets.open} company={company} assigneeOf={assigneeOf} />
+            <Bucket title="Completo" tickets={buckets.done} company={company} assigneeOf={assigneeOf} />
+            <Bucket
+              title="Sigue"
+              tickets={buckets.carried}
+              company={company}
+              assigneeOf={assigneeOf}
+              hintFor={(ticket) => {
+                const next = sprintById.get(ticket.sprint_id)
+                if (!next || next.id === sprint.id) return assigneeOf(ticket)
+                return `Sigue en ${sprintSpan(next) || next.name}`
+              }}
+            />
+          </div>
+        )}
+    </div>
+  )
+}
+
 export function Calendar() {
   const { companyId } = useParams()
   const { company, role } = useOutletContext()
@@ -31,6 +124,9 @@ export function Calendar() {
   const today = new Date()
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() })
   const [sprints, setSprints] = useState([])
+  const [objectives, setObjectives] = useState([])
+  const [categories, setCategories] = useState([])
+  const [stays, setStays] = useState([])
   const [tickets, setTickets] = useState([])
   const [events, setEvents] = useState([])
   const [members, setMembers] = useState([])
@@ -39,16 +135,22 @@ export function Calendar() {
   const [notice, setNotice] = useState('')
 
   async function load() {
-    const [sprintRes, ticketRes, eventRes, memberRes] = await Promise.all([
-      supabase.from('sprints').select('id, name, starts_on, ends_on').eq('company_id', companyId).order('starts_on'),
+    const [sprintRes, objectiveRes, categoryRes, stayRes, ticketRes, eventRes, memberRes] = await Promise.all([
+      supabase.from('sprints').select('id, name, starts_on, ends_on, objective_id').eq('company_id', companyId).order('starts_on'),
+      supabase.from('objectives').select('id, name, category_id').eq('company_id', companyId).order('name'),
+      supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
+      supabase.from('ticket_sprint_stays').select('ticket_id, sprint_id, outcome').eq('company_id', companyId),
       supabase.from('ticket_rows').select('id, public_number, title, sprint_id, status_kind, progress, assignee_id, priority, estimate, rank').eq('company_id', companyId).order('rank'),
       supabase.from('ticket_events').select('ticket_id, body, created_at').eq('company_id', companyId).order('created_at'),
       supabase.from('company_members').select('user_id, alias').eq('company_id', companyId),
     ])
-    const failed = [sprintRes, ticketRes, eventRes, memberRes].find((item) => item.error)
+    const failed = [sprintRes, objectiveRes, categoryRes, stayRes, ticketRes, eventRes, memberRes].find((item) => item.error)
     if (failed) setError(messageFrom(failed.error))
     else {
       setSprints(sprintRes.data ?? [])
+      setObjectives(objectiveRes.data ?? [])
+      setCategories(categoryRes.data ?? [])
+      setStays(stayRes.data ?? [])
       setTickets(ticketRes.data ?? [])
       setEvents(eventRes.data ?? [])
       setMembers(memberRes.data ?? [])
@@ -71,11 +173,25 @@ export function Calendar() {
     () => new Map(members.map((member) => [member.user_id, memberName(member)])),
     [members],
   )
+  const ticketsById = useMemo(() => new Map(tickets.map((ticket) => [ticket.id, ticket])), [tickets])
+  const sprintById = useMemo(() => new Map(sprints.map((sprint) => [sprint.id, sprint])), [sprints])
   const title = new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' }).format(new Date(cursor.year, cursor.month, 1))
 
   function assigneeOf(ticket) {
     if (!ticket.assignee_id) return 'Sin asignar'
     return assigneeById.get(ticket.assignee_id) ?? 'Sin asignar'
+  }
+
+  function storyOf(sprint, objective) {
+    const buckets = bucketStays(
+      stays.filter((stay) => stay.sprint_id === sprint.id),
+      ticketsById,
+    )
+    const counted = [...buckets.open, ...buckets.done, ...buckets.carried]
+    const span = sprintSpan(sprint)
+    const size = sizeLine(counted.map((ticket) => ticket.estimate))
+    const barName = [objective ? span : (span || sprint.name), size].filter(Boolean).join(' · ')
+    return { buckets, span, barName: barName || sprint.name }
   }
 
   function shift(delta) {
@@ -137,62 +253,45 @@ export function Calendar() {
               )
             })}
           </div>
-          {sprints.map((sprint) => {
-            let from = -1
-            let to = -1
-            days.forEach((day, index) => {
-              const key = localDateKey(day)
-              if (key >= sprint.starts_on && key <= sprint.ends_on) {
-                if (from < 0) from = index
-                to = index
-              }
-            })
-            if (from < 0) return null
-            const carried = tickets.filter((ticket) => ticket.sprint_id === sprint.id)
-            const firstWeek = weeks.find((candidate) => {
-              const start = localDateKey(candidate[0])
-              const end = localDateKey(candidate[6])
-              return sprint.starts_on <= end && sprint.ends_on >= start
-            })
-            const showTickets = firstWeek && localDateKey(firstWeek[0]) === localDateKey(days[0])
-            const detail = (
-              <>
-                <div className="cluster">
-                  <strong>{sprint.name}</strong>
-                  {editable && <Link className="text-btn" to={`s/${sprint.id}`}>Editar</Link>}
-                </div>
-                {carried.length === 0
-                  ? <div className="quiet">Sin tickets. Asígnale este sprint en la ficha.</div>
-                  : (
-                    <ul className="sprint-tickets">
-                      {carried.map((ticket) => (
-                        <li key={ticket.id}>
-                          <Link className="sprint-name" to={`../t/${ticket.id}`}>
-                            <span className="closed-key">{ticketKey(company.ticket_prefix, ticket.public_number)}</span>
-                            <span className="sprint-copy">
-                              <span className="sprint-title">{ticket.title}</span>
-                              <span className="quiet">
-                                {finished(ticket) ? `Completo · ${assigneeOf(ticket)}` : assigneeOf(ticket)}
-                              </span>
-                            </span>
-                          </Link>
-                          <TicketChips priority={ticket.priority} estimate={ticket.estimate} />
-                          <Progress value={ticket.progress} />
-                        </li>
-                      ))}
-                    </ul>
+          {objectiveLanes(sprints, objectives, localDateKey(days[0]), localDateKey(days[6])).map((lane) => (
+            <div className="bar-row" key={lane.key}>
+              {lane.objective && (
+                <div className="objective-head">
+                  <strong>{lane.objective.name}</strong>
+                  {categories.find((item) => item.id === lane.objective.category_id)?.name && (
+                    <span className="quiet">{categories.find((item) => item.id === lane.objective.category_id).name}</span>
                   )}
-              </>
-            )
-            return (
-              <div className="bar-row" key={sprint.id}>
-                <div className="bar slim" style={{ gridColumn: `${from + 1} / ${to + 2}` }}>
-                  <strong className="bar-name">{sprint.name}</strong>
                 </div>
-                {showTickets && <div className="bar-detail">{detail}</div>}
-              </div>
-            )
-          })}
+              )}
+              {lane.sprints.map((sprint) => {
+                const placed = placeSprint(sprint, days)
+                if (!placed) return null
+                const story = storyOf(sprint, lane.objective)
+                return (
+                  <div key={sprint.id} className="bar slim" style={{ gridColumn: `${placed.from + 1} / ${placed.to + 2}` }}>
+                    <strong className="bar-name">{story.barName}</strong>
+                  </div>
+                )
+              })}
+              {lane.sprints.map((sprint) => {
+                const placed = placeSprint(sprint, days)
+                if (!placed || !sprintStartsThisWeek(sprint, weeks, days)) return null
+                const story = storyOf(sprint, lane.objective)
+                return (
+                  <SprintDetail
+                    key={`${sprint.id}-detail`}
+                    sprint={sprint}
+                    span={story.span}
+                    buckets={story.buckets}
+                    editable={editable}
+                    company={company}
+                    assigneeOf={assigneeOf}
+                    sprintById={sprintById}
+                  />
+                )
+              })}
+            </div>
+          ))}
         </div>
       ))}
       </div>
