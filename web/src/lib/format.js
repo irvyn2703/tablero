@@ -139,3 +139,34 @@ export function messageFrom(error) {
   const text = error.message || String(error)
   return text.replace(/^.*ERROR:\s*/i, '').replace(/\s+$/, '')
 }
+
+const monthName = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+export function localDateKey(date = new Date()) {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
+function dateParts(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''))
+  if (!match) return null
+  const month = Number(match[2])
+  const day = Number(match[3])
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null
+  return { year: Number(match[1]), month, day }
+}
+
+export function sprintSpan(sprint) {
+  const start = dateParts(sprint?.starts_on)
+  const end = dateParts(sprint?.ends_on)
+  if (!start || !end) return ''
+  if (start.year === end.year && start.month === end.month) {
+    return `${start.day}–${end.day} ${monthName[end.month - 1]}`
+  }
+  if (start.year === end.year) {
+    return `${start.day} ${monthName[start.month - 1]}–${end.day} ${monthName[end.month - 1]}`
+  }
+  return `${start.day} ${monthName[start.month - 1]} ${start.year}–${end.day} ${monthName[end.month - 1]} ${end.year}`
+}
+

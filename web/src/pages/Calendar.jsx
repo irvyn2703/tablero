@@ -2,16 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { groupDayMarks, marksByDay } from '../lib/calendarMarks'
-import { canEdit, formatProgress, memberName, messageFrom, ticketKey } from '../lib/format'
+import { canEdit, formatProgress, localDateKey, memberName, messageFrom, ticketKey } from '../lib/format'
 import { Alert, Progress, TicketChips } from '../components/ui'
 
 const weekday = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
-
-function keyOf(date) {
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${date.getFullYear()}-${month}-${day}`
-}
 
 function finished(ticket) {
   return ticket.status_kind === 'close' || Number(ticket.progress) >= 100
@@ -72,7 +66,7 @@ export function Calendar() {
   }, [location.state])
 
   const weeks = useMemo(() => weeksOf(cursor.year, cursor.month), [cursor])
-  const marks = useMemo(() => marksByDay(tickets, events, keyOf), [tickets, events])
+  const marks = useMemo(() => marksByDay(tickets, events, localDateKey), [tickets, events])
   const assigneeById = useMemo(
     () => new Map(members.map((member) => [member.user_id, memberName(member)])),
     [members],
@@ -109,10 +103,10 @@ export function Calendar() {
         {weekday.map((day) => <span key={day} className="quiet">{day}</span>)}
       </div>
       {weeks.map((days) => (
-        <div className="calendar-week" key={keyOf(days[0])}>
+        <div className="calendar-week" key={localDateKey(days[0])}>
           <div className="days">
             {days.map((day) => {
-              const key = keyOf(day)
+              const key = localDateKey(day)
               return (
                 <div key={key} className={day.getMonth() === cursor.month ? 'day' : 'day out'}>
                   <span>{day.getDate()}</span>
@@ -147,7 +141,7 @@ export function Calendar() {
             let from = -1
             let to = -1
             days.forEach((day, index) => {
-              const key = keyOf(day)
+              const key = localDateKey(day)
               if (key >= sprint.starts_on && key <= sprint.ends_on) {
                 if (from < 0) from = index
                 to = index
@@ -156,11 +150,11 @@ export function Calendar() {
             if (from < 0) return null
             const carried = tickets.filter((ticket) => ticket.sprint_id === sprint.id)
             const firstWeek = weeks.find((candidate) => {
-              const start = keyOf(candidate[0])
-              const end = keyOf(candidate[6])
+              const start = localDateKey(candidate[0])
+              const end = localDateKey(candidate[6])
               return sprint.starts_on <= end && sprint.ends_on >= start
             })
-            const showTickets = firstWeek && keyOf(firstWeek[0]) === keyOf(days[0])
+            const showTickets = firstWeek && localDateKey(firstWeek[0]) === localDateKey(days[0])
             const detail = (
               <>
                 <div className="cluster">

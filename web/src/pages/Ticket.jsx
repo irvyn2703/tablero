@@ -1,12 +1,30 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { absolutePath, supabase } from '../lib/supabase'
-import { autonomyLabel, canEdit, estimateLabel, formatWhen, memberName, messageFrom, priorityLabel, ticketKey } from '../lib/format'
+import { autonomyLabel, canEdit, estimateLabel, formatWhen, localDateKey, memberName, messageFrom, priorityLabel, sprintSpan, ticketKey } from '../lib/format'
 import { discardTicket, openTicketFile, takeFiles, uploadTicketFiles } from '../lib/files'
 import { useLogoUrl } from '../lib/logo'
 import { FilePicker, SavedFiles } from '../components/Files'
 import { Thread } from '../components/Thread'
 import { ActionButton, Alert, Done, Progress, Secret, TicketChips, useFeedback, writeClipboard } from '../components/ui'
+
+function sprintChoices(sprints, selectedId, today) {
+  const current = []
+  const upcoming = []
+  const previous = []
+  for (const sprint of sprints) {
+    const start = String(sprint.starts_on || '')
+    const end = String(sprint.ends_on || '')
+    if (start && end && start <= today && end >= today) current.push(sprint)
+    else if (start && start > today) upcoming.push(sprint)
+    else if (sprint.id === selectedId) previous.push(sprint)
+  }
+  return [
+    current.length ? { label: 'En curso', sprints: current } : null,
+    upcoming.length ? { label: 'Próximos', sprints: upcoming } : null,
+    previous.length ? { label: 'Anterior', sprints: previous } : null,
+  ].filter(Boolean)
+}
 
 export function Ticket() {
   const navigate = useNavigate()
@@ -18,6 +36,7 @@ export function Ticket() {
   const [statuses, setStatuses] = useState([])
   const [members, setMembers] = useState([])
   const [sprints, setSprints] = useState([])
+  const [savedSprintId, setSavedSprintId] = useState(null)
   const [versions, setVersions] = useState([])
   const [repos, setRepos] = useState([])
   const [chosenRepos, setChosenRepos] = useState([])
@@ -37,7 +56,7 @@ export function Ticket() {
       supabase.from('ticket_rows').select('*').eq('id', ticketId).maybeSingle(),
       supabase.from('statuses').select('id, name, allows_delete').eq('company_id', companyId).order('position'),
       supabase.from('company_members').select('user_id, alias').eq('company_id', companyId),
-      supabase.from('sprints').select('id, name').eq('company_id', companyId).order('starts_on'),
+      supabase.from('sprints').select('id, name, starts_on, ends_on').eq('company_id', companyId).order('starts_on'),
       supabase.from('versions').select('id, name').eq('company_id', companyId).order('created_at', { ascending: false }),
       supabase.from('repos').select('id, github_full_name, default_branch').eq('company_id', companyId),
       supabase.from('ticket_repos').select('repo_id').eq('ticket_id', ticketId),
@@ -54,6 +73,7 @@ export function Ticket() {
       return
     }
     setTicket(ticketRes.data)
+    setSavedSprintId(ticketRes.data?.sprint_id || null)
     setStatuses(statusRes.data ?? [])
     setMembers(memberRes.data ?? [])
     setSprints(sprintRes.data ?? [])
@@ -166,7 +186,10 @@ export function Ticket() {
         setError(messageFrom(clearCategories))
         return false
       }
-      if (chosenCategories.length === 0) return
+      if (chosenCategories.length === 0) {
+        setSavedSprintId(ticket.sprint_id || null)
+        return
+      }
       const { error: categoryError } = await supabase.from('ticket_categories').insert(
         chosenCategories.map((categoryId) => ({ company_id: companyId, ticket_id: ticketId, category_id: categoryId })),
       )
@@ -174,6 +197,7 @@ export function Ticket() {
         setError(messageFrom(categoryError))
         return false
       }
+      setSavedSprintId(ticket.sprint_id || null)
     }, 'Ficha guardada.')
   }
 
@@ -272,7 +296,18 @@ export function Ticket() {
             <span>Sprint</span>
             <select value={ticket.sprint_id || ''} onChange={(event) => patch({ sprint_id: event.target.value })} disabled={!editable}>
               <option value="">Backlog</option>
-              {sprints.map((sprint) => <option key={sprint.id} value={sprint.id}>{sprint.name}</option>)}
+              {sprintChoices(sprints, savedSprintId, localDateKey()).map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.sprints.map((sprint) => {
+                    const span = sprintSpan(sprint)
+                    return (
+                      <option key={sprint.id} value={sprint.id}>
+                        {span ? `${sprint.name} · ${span}` : sprint.name}
+                      </option>
+                    )
+                  })}
+                </optgroup>
+              ))}
             </select>
           </label>
           <label className="field">
