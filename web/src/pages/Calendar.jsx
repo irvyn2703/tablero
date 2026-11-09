@@ -124,8 +124,8 @@ export function Calendar() {
                           <span className="mark-keys">
                             {group.tickets.map((mark) => (
                               <Link key={mark.id} to={`../t/${mark.id}`}>
-                                {ticketKey(company.ticket_prefix, mark.public_number)}
-                                {!shared && ` ${formatProgress(mark.percent)}%`}
+                                <span className="closed-key">{ticketKey(company.ticket_prefix, mark.public_number)}</span>
+                                {!shared && <span className="closed-percent">({formatProgress(mark.percent)}%)</span>}
                               </Link>
                             ))}
                           </span>
