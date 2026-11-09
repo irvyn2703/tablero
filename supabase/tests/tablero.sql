@@ -1,6 +1,6 @@
 begin;
 
-select plan(39);
+select plan(41);
 
 insert into public.companies (name, slug)
 values ('Acme', 'acme')
@@ -364,6 +364,40 @@ select is(
   ) ->> 'status'),
   'En cola',
   'el agente pasa el ticket al estado nombrado'
+);
+
+update public.tickets
+set view_token = repeat('a', 64),
+    view_token_hash = private.sha256_hex(repeat('a', 64))
+where id = :'ticket_id'::uuid;
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}',
+  true
+);
+select set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', true);
+set local role authenticated;
+
+select results_eq(
+  format(
+    $sql$update public.tickets set title = 'Arreglar el margen' where id = %L::uuid returning title$sql$,
+    :'ticket_id'
+  ),
+  $$values ('Arreglar el margen'::text)$$,
+  'un miembro edita un ticket con liga de seguimiento'
+);
+
+reset role;
+
+select throws_ok(
+  format(
+    $sql$update public.tickets set view_token = %L where id = %L::uuid$sql$,
+    repeat('b', 64),
+    :'ticket_id'
+  ),
+  'P0001',
+  'el enlace de seguimiento no coincide'
 );
 
 select is(private.file_mime('foto.PNG'), 'image/png', 'una imagen png');
