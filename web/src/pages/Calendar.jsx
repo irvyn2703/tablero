@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { groupDayMarks, marksByDay } from '../lib/calendarMarks'
-import { canEdit, formatProgress, localDateKey, memberName, messageFrom, sprintSpan, ticketKey } from '../lib/format'
+import { canEdit, formatProgress, localDateKey, messageFrom, sprintSpan, ticketKey } from '../lib/format'
 import { bucketStays, objectiveLanes, sizeLine } from '../lib/sprintStory'
-import { Alert, Progress, TicketChips } from '../components/ui'
+import { Alert } from '../components/ui'
 
 const weekday = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
@@ -21,23 +21,19 @@ function weeksOf(year, month) {
   ))
 }
 
-function TicketLine({ ticket, company, assigneeOf, hint }) {
+function StoryLine({ ticket, company, extra, done }) {
   return (
     <li>
-      <Link className="sprint-name" to={`../t/${ticket.id}`}>
+      <Link className={done ? 'story-line is-done' : 'story-line'} to={`../t/${ticket.id}`}>
         <span className="closed-key">{ticketKey(company.ticket_prefix, ticket.public_number)}</span>
-        <span className="sprint-copy">
-          <span className="sprint-title">{ticket.title}</span>
-          <span className="quiet">{hint || assigneeOf(ticket)}</span>
-        </span>
+        <span className="sprint-title">{ticket.title}</span>
+        {extra && <span className="story-next">{extra}</span>}
       </Link>
-      <TicketChips priority={ticket.priority} estimate={ticket.estimate} />
-      <Progress value={ticket.progress} />
     </li>
   )
 }
 
-function Bucket({ title, tickets, company, assigneeOf, hintFor }) {
+function Bucket({ title, tickets, company, done, extraFor }) {
   return (
     <div>
       <span className="quiet">{title}</span>
@@ -46,12 +42,12 @@ function Bucket({ title, tickets, company, assigneeOf, hintFor }) {
         : (
           <ul className="sprint-tickets">
             {tickets.map((ticket) => (
-              <TicketLine
+              <StoryLine
                 key={ticket.id}
                 ticket={ticket}
                 company={company}
-                assigneeOf={assigneeOf}
-                hint={hintFor ? hintFor(ticket) : ''}
+                done={done}
+                extra={extraFor ? extraFor(ticket) : ''}
               />
             ))}
           </ul>
@@ -74,41 +70,38 @@ function placeSprint(sprint, days) {
   return { from, to }
 }
 
-function sprintStartsThisWeek(sprint, weeks, days) {
-  const firstWeek = weeks.find((candidate) => {
-    const start = localDateKey(candidate[0])
-    const end = localDateKey(candidate[6])
-    return sprint.starts_on <= end && sprint.ends_on >= start
-  })
-  return Boolean(firstWeek) && localDateKey(firstWeek[0]) === localDateKey(days[0])
+function weekHolds(date, days) {
+  return date >= localDateKey(days[0]) && date <= localDateKey(days[6])
 }
 
-function SprintDetail({ sprint, span, buckets, editable, company, assigneeOf, sprintById }) {
+function laneTone(categoryName) {
+  const name = String(categoryName || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim()
+  if (name === 'movil' || name === 'mobile') return 'brass'
+  return 'pine'
+}
+
+function SprintDetail({ sprint, span, buckets, tone, editable, company, sprintById }) {
   const counted = buckets.open.length + buckets.done.length + buckets.carried.length
   return (
-    <div className="bar-detail">
+    <div className={`bar-detail tone-${tone}`}>
       <div className="cluster">
         <strong>{span || sprint.name}</strong>
         {editable && <Link className="text-btn" to={`s/${sprint.id}`}>Editar</Link>}
       </div>
-      <p className="quiet">
-        {`comprometido ${buckets.open.length} · completo ${buckets.done.length} · sigue ${buckets.carried.length}`}
-      </p>
       {counted === 0
         ? <div className="quiet">Sin tickets. Asígnale este sprint en la ficha.</div>
         : (
           <div className="sprint-buckets">
-            <Bucket title="Comprometido" tickets={buckets.open} company={company} assigneeOf={assigneeOf} />
-            <Bucket title="Completo" tickets={buckets.done} company={company} assigneeOf={assigneeOf} />
+            <Bucket title="Comprometido" tickets={buckets.open} company={company} />
+            <Bucket title="Completo" tickets={buckets.done} company={company} done />
             <Bucket
               title="Sigue"
               tickets={buckets.carried}
               company={company}
-              assigneeOf={assigneeOf}
-              hintFor={(ticket) => {
+              extraFor={(ticket) => {
                 const next = sprintById.get(ticket.sprint_id)
-                if (!next || next.id === sprint.id) return assigneeOf(ticket)
-                return `Sigue en ${sprintSpan(next) || next.name}`
+                if (!next || next.id === sprint.id) return ''
+                return sprintSpan(next) || next.name
               }}
             />
           </div>
@@ -129,22 +122,21 @@ export function Calendar() {
   const [stays, setStays] = useState([])
   const [tickets, setTickets] = useState([])
   const [events, setEvents] = useState([])
-  const [members, setMembers] = useState([])
   const [error, setError] = useState('')
   const location = useLocation()
   const [notice, setNotice] = useState('')
+  const [openSprintId, setOpenSprintId] = useState(null)
 
   async function load() {
-    const [sprintRes, objectiveRes, categoryRes, stayRes, ticketRes, eventRes, memberRes] = await Promise.all([
+    const [sprintRes, objectiveRes, categoryRes, stayRes, ticketRes, eventRes] = await Promise.all([
       supabase.from('sprints').select('id, name, starts_on, ends_on, objective_id').eq('company_id', companyId).order('starts_on'),
       supabase.from('objectives').select('id, name, category_id').eq('company_id', companyId).order('name'),
       supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
       supabase.from('ticket_sprint_stays').select('ticket_id, sprint_id, outcome').eq('company_id', companyId),
-      supabase.from('ticket_rows').select('id, public_number, title, sprint_id, status_kind, progress, assignee_id, priority, estimate, rank').eq('company_id', companyId).order('rank'),
+      supabase.from('ticket_rows').select('id, public_number, title, sprint_id, estimate').eq('company_id', companyId),
       supabase.from('ticket_events').select('ticket_id, body, created_at').eq('company_id', companyId).order('created_at'),
-      supabase.from('company_members').select('user_id, alias').eq('company_id', companyId),
     ])
-    const failed = [sprintRes, objectiveRes, categoryRes, stayRes, ticketRes, eventRes, memberRes].find((item) => item.error)
+    const failed = [sprintRes, objectiveRes, categoryRes, stayRes, ticketRes, eventRes].find((item) => item.error)
     if (failed) setError(messageFrom(failed.error))
     else {
       setSprints(sprintRes.data ?? [])
@@ -153,7 +145,6 @@ export function Calendar() {
       setStays(stayRes.data ?? [])
       setTickets(ticketRes.data ?? [])
       setEvents(eventRes.data ?? [])
-      setMembers(memberRes.data ?? [])
     }
   }
 
@@ -169,30 +160,36 @@ export function Calendar() {
 
   const weeks = useMemo(() => weeksOf(cursor.year, cursor.month), [cursor])
   const marks = useMemo(() => marksByDay(tickets, events, localDateKey), [tickets, events])
-  const assigneeById = useMemo(
-    () => new Map(members.map((member) => [member.user_id, memberName(member)])),
-    [members],
-  )
   const ticketsById = useMemo(() => new Map(tickets.map((ticket) => [ticket.id, ticket])), [tickets])
   const sprintById = useMemo(() => new Map(sprints.map((sprint) => [sprint.id, sprint])), [sprints])
+  const storyBySprintId = useMemo(() => {
+    const staysBySprint = new Map()
+    for (const stay of stays) {
+      const list = staysBySprint.get(stay.sprint_id) || []
+      list.push(stay)
+      staysBySprint.set(stay.sprint_id, list)
+    }
+    return new Map(sprints.map((sprint) => {
+      const buckets = bucketStays(staysBySprint.get(sprint.id) || [], ticketsById)
+      const counted = [...buckets.open, ...buckets.done, ...buckets.carried]
+      return [sprint.id, {
+        buckets,
+        span: sprintSpan(sprint),
+        size: sizeLine(counted.map((ticket) => ticket.estimate)),
+      }]
+    }))
+  }, [sprints, stays, ticketsById])
+  const startByObjectiveId = useMemo(() => {
+    const starts = new Map()
+    for (const sprint of sprints) {
+      if (!sprint.objective_id) continue
+      const current = starts.get(sprint.objective_id)
+      if (!current || sprint.starts_on < current) starts.set(sprint.objective_id, sprint.starts_on)
+    }
+    return starts
+  }, [sprints])
+  const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories])
   const title = new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' }).format(new Date(cursor.year, cursor.month, 1))
-
-  function assigneeOf(ticket) {
-    if (!ticket.assignee_id) return 'Sin asignar'
-    return assigneeById.get(ticket.assignee_id) ?? 'Sin asignar'
-  }
-
-  function storyOf(sprint, objective) {
-    const buckets = bucketStays(
-      stays.filter((stay) => stay.sprint_id === sprint.id),
-      ticketsById,
-    )
-    const counted = [...buckets.open, ...buckets.done, ...buckets.carried]
-    const span = sprintSpan(sprint)
-    const size = sizeLine(counted.map((ticket) => ticket.estimate))
-    const barName = [objective ? span : (span || sprint.name), size].filter(Boolean).join(' · ')
-    return { buckets, span, barName: barName || sprint.name }
-  }
 
   function shift(delta) {
     const next = new Date(cursor.year, cursor.month + delta, 1)
@@ -253,45 +250,69 @@ export function Calendar() {
               )
             })}
           </div>
-          {objectiveLanes(sprints, objectives, localDateKey(days[0]), localDateKey(days[6])).map((lane) => (
-            <div className="bar-row" key={lane.key}>
-              {lane.objective && (
-                <div className="objective-head">
+          {objectiveLanes(sprints, objectives, localDateKey(days[0]), localDateKey(days[6])).map((lane) => {
+            const category = lane.objective ? categoryById.get(lane.objective.category_id) : null
+            const tone = laneTone(category?.name)
+            const starts = lane.objective ? startByObjectiveId.get(lane.objective.id) || '' : ''
+            const namedHere = Boolean(lane.objective) && Boolean(starts) && weekHolds(starts, days)
+            const weekKey = localDateKey(days[0])
+            const bars = lane.sprints.flatMap((sprint) => {
+              const placed = placeSprint(sprint, days)
+              const story = storyBySprintId.get(sprint.id)
+              return placed && story ? [{ sprint, placed, story }] : []
+            })
+            const openBar = bars.find((bar) => openSprintId === `${bar.sprint.id}:${weekKey}`)
+            return (
+            <div className={namedHere || !lane.objective ? 'bar-row' : 'bar-row is-continued'} key={lane.key}>
+              {namedHere && (
+                <div className={`objective-head tone-${tone}`}>
                   <strong>{lane.objective.name}</strong>
-                  {categories.find((item) => item.id === lane.objective.category_id)?.name && (
-                    <span className="quiet">{categories.find((item) => item.id === lane.objective.category_id).name}</span>
-                  )}
+                  {category?.name && <span className="quiet">{category.name}</span>}
                 </div>
               )}
-              {lane.sprints.map((sprint) => {
-                const placed = placeSprint(sprint, days)
-                if (!placed) return null
-                const story = storyOf(sprint, lane.objective)
+              {bars.map(({ sprint, placed, story }) => {
+                const open = openBar?.sprint.id === sprint.id
+                const label = [
+                  story.span || sprint.name,
+                  story.size,
+                  `${story.buckets.open.length} comprometido`,
+                  `${story.buckets.done.length} completo`,
+                  `${story.buckets.carried.length} sigue`,
+                ].filter(Boolean).join(', ')
                 return (
-                  <div key={sprint.id} className="bar slim" style={{ gridColumn: `${placed.from + 1} / ${placed.to + 2}` }}>
-                    <strong className="bar-name">{story.barName}</strong>
-                  </div>
+                  <button
+                    key={sprint.id}
+                    type="button"
+                    className={`bar slim tone-${tone}${open ? ' is-open' : ''}`}
+                    style={{ gridColumn: `${placed.from + 1} / ${placed.to + 2}` }}
+                    aria-expanded={open}
+                    aria-label={label}
+                    onClick={() => setOpenSprintId(open ? null : `${sprint.id}:${weekKey}`)}
+                  >
+                    <span className="bar-when">{story.span || sprint.name}</span>
+                    {story.size && <span className="bar-size">{story.size}</span>}
+                    <span className="bar-counts" aria-hidden="true">
+                      <span className="count-open">{story.buckets.open.length}</span>
+                      <span className="count-done">{story.buckets.done.length}</span>
+                      <span className="count-carried">{story.buckets.carried.length}</span>
+                    </span>
+                  </button>
                 )
               })}
-              {lane.sprints.map((sprint) => {
-                const placed = placeSprint(sprint, days)
-                if (!placed || !sprintStartsThisWeek(sprint, weeks, days)) return null
-                const story = storyOf(sprint, lane.objective)
-                return (
-                  <SprintDetail
-                    key={`${sprint.id}-detail`}
-                    sprint={sprint}
-                    span={story.span}
-                    buckets={story.buckets}
-                    editable={editable}
-                    company={company}
-                    assigneeOf={assigneeOf}
-                    sprintById={sprintById}
-                  />
-                )
-              })}
+              {openBar && (
+                <SprintDetail
+                  sprint={openBar.sprint}
+                  span={openBar.story.span}
+                  buckets={openBar.story.buckets}
+                  tone={tone}
+                  editable={editable}
+                  company={company}
+                  sprintById={sprintById}
+                />
+              )}
             </div>
-          ))}
+            )
+          })}
         </div>
       ))}
       </div>
