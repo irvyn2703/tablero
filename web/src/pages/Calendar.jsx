@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { groupDayMarks, marksByDay } from '../lib/calendarMarks'
-import { canEdit, formatProgress, localDateKey, messageFrom, sprintSpan, ticketKey } from '../lib/format'
+import { canEdit, formatProgress, localDateKey, memberName, messageFrom, sprintSpan, ticketKey } from '../lib/format'
 import { bucketStays, objectiveLanes, sizeLine } from '../lib/sprintStory'
-import { Alert } from '../components/ui'
+import { Alert, Progress, TicketChips } from '../components/ui'
 
 const weekday = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
@@ -21,19 +21,26 @@ function weeksOf(year, month) {
   ))
 }
 
-function StoryLine({ ticket, company, extra, done }) {
+function StoryLine({ ticket, company, assignee, extra, done }) {
   return (
     <li>
       <Link className={done ? 'story-line is-done' : 'story-line'} to={`../t/${ticket.id}`}>
         <span className="closed-key">{ticketKey(company.ticket_prefix, ticket.public_number)}</span>
-        <span className="sprint-title">{ticket.title}</span>
-        {extra && <span className="story-next">{extra}</span>}
+        <span className="sprint-copy">
+          <span className="sprint-title">{ticket.title}</span>
+          <span className="sprint-meta quiet">
+            <span>{assignee}</span>
+            {extra && <span className="story-next">{extra}</span>}
+          </span>
+        </span>
       </Link>
+      <TicketChips priority={ticket.priority} estimate={ticket.estimate} />
+      <Progress value={ticket.progress} />
     </li>
   )
 }
 
-function Bucket({ title, tickets, company, done, extraFor }) {
+function Bucket({ title, tickets, company, assigneeOf, done, extraFor }) {
   if (!tickets.length) return null
   return (
     <div>
@@ -44,6 +51,7 @@ function Bucket({ title, tickets, company, done, extraFor }) {
             key={ticket.id}
             ticket={ticket}
             company={company}
+            assignee={assigneeOf(ticket)}
             done={done}
             extra={extraFor ? extraFor(ticket) : ''}
           />
@@ -102,7 +110,7 @@ function laneTone(categoryName) {
   return 'pine'
 }
 
-function SprintDetail({ sprint, span, buckets, tone, editable, company, sprintById }) {
+function SprintDetail({ sprint, span, buckets, tone, editable, company, assigneeOf, sprintById }) {
   const filled = [buckets.open, buckets.done, buckets.carried].filter((tickets) => tickets.length).length
   return (
     <div className={`bar-detail tone-${tone}`}>
@@ -114,12 +122,13 @@ function SprintDetail({ sprint, span, buckets, tone, editable, company, sprintBy
         ? <div className="quiet">Sin tickets. Asígnale este sprint en la ficha.</div>
         : (
           <div className={`sprint-buckets cols-${filled}`}>
-            <Bucket title="Comprometido" tickets={buckets.open} company={company} />
-            <Bucket title="Completo" tickets={buckets.done} company={company} done />
+            <Bucket title="Comprometido" tickets={buckets.open} company={company} assigneeOf={assigneeOf} />
+            <Bucket title="Completo" tickets={buckets.done} company={company} assigneeOf={assigneeOf} done />
             <Bucket
               title="Sigue"
               tickets={buckets.carried}
               company={company}
+              assigneeOf={assigneeOf}
               extraFor={(ticket) => {
                 const next = sprintById.get(ticket.sprint_id)
                 if (!next || next.id === sprint.id) return ''
@@ -144,21 +153,23 @@ export function Calendar() {
   const [stays, setStays] = useState([])
   const [tickets, setTickets] = useState([])
   const [events, setEvents] = useState([])
+  const [members, setMembers] = useState([])
   const [error, setError] = useState('')
   const location = useLocation()
   const [notice, setNotice] = useState('')
   const [openSprintId, setOpenSprintId] = useState(null)
 
   async function load() {
-    const [sprintRes, objectiveRes, categoryRes, stayRes, ticketRes, eventRes] = await Promise.all([
+    const [sprintRes, objectiveRes, categoryRes, stayRes, ticketRes, eventRes, memberRes] = await Promise.all([
       supabase.from('sprints').select('id, name, starts_on, ends_on, objective_id').eq('company_id', companyId).order('starts_on'),
       supabase.from('objectives').select('id, name, category_id').eq('company_id', companyId).order('name'),
       supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
       supabase.from('ticket_sprint_stays').select('ticket_id, sprint_id, outcome').eq('company_id', companyId),
-      supabase.from('ticket_rows').select('id, public_number, title, sprint_id, estimate').eq('company_id', companyId),
+      supabase.from('ticket_rows').select('id, public_number, title, sprint_id, progress, assignee_id, priority, estimate').eq('company_id', companyId),
       supabase.from('ticket_events').select('ticket_id, body, created_at').eq('company_id', companyId).order('created_at'),
+      supabase.from('company_members').select('user_id, alias').eq('company_id', companyId),
     ])
-    const failed = [sprintRes, objectiveRes, categoryRes, stayRes, ticketRes, eventRes].find((item) => item.error)
+    const failed = [sprintRes, objectiveRes, categoryRes, stayRes, ticketRes, eventRes, memberRes].find((item) => item.error)
     if (failed) setError(messageFrom(failed.error))
     else {
       setSprints(sprintRes.data ?? [])
@@ -167,6 +178,7 @@ export function Calendar() {
       setStays(stayRes.data ?? [])
       setTickets(ticketRes.data ?? [])
       setEvents(eventRes.data ?? [])
+      setMembers(memberRes.data ?? [])
     }
   }
 
@@ -182,6 +194,10 @@ export function Calendar() {
 
   const weeks = useMemo(() => weeksOf(cursor.year, cursor.month), [cursor])
   const marks = useMemo(() => marksByDay(tickets, events, localDateKey), [tickets, events])
+  const assigneeById = useMemo(
+    () => new Map(members.map((member) => [member.user_id, memberName(member)])),
+    [members],
+  )
   const ticketsById = useMemo(() => new Map(tickets.map((ticket) => [ticket.id, ticket])), [tickets])
   const sprintById = useMemo(() => new Map(sprints.map((sprint) => [sprint.id, sprint])), [sprints])
   const storyBySprintId = useMemo(() => {
@@ -212,6 +228,11 @@ export function Calendar() {
   }, [sprints])
   const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories])
   const title = new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' }).format(new Date(cursor.year, cursor.month, 1))
+
+  function assigneeOf(ticket) {
+    if (!ticket.assignee_id) return 'Sin asignar'
+    return assigneeById.get(ticket.assignee_id) ?? 'Sin asignar'
+  }
 
   function shift(delta) {
     const next = new Date(cursor.year, cursor.month + delta, 1)
@@ -325,6 +346,7 @@ export function Calendar() {
                   tone={tone}
                   editable={editable}
                   company={company}
+                  assigneeOf={assigneeOf}
                   sprintById={sprintById}
                 />
               )}

@@ -248,6 +248,14 @@ button.bar {
   gap: 0.35rem;
 }
 
+.sprint-tickets li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(5.5rem, 7.5rem);
+  align-items: center;
+  column-gap: 0.75rem;
+  min-width: 0;
+}
+
 .story-line {
   display: flex;
   gap: 0.45rem;
@@ -255,6 +263,26 @@ button.bar {
   max-width: 100%;
   min-width: 0;
 }
+
+.sprint-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sprint-meta {
+  display: flex;
+  gap: 0.45rem;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.sprint-tickets .chips {
+  flex-wrap: nowrap;
+  margin: 0;
+}
+
+.sprint-tickets .meter { width: 100%; margin: 0; }
 
 .story-line.is-done { color: var(--brass); }
 
@@ -312,5 +340,9 @@ button.bar {
   .day .mark { align-items: center; text-align: center; }
   .sprint-buckets.cols-2,
   .sprint-buckets.cols-3 { grid-template-columns: 1fr; }
+  .sprint-tickets li {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.2rem;
+  }
   .bar { min-width: 0; padding: 0.2rem 0.3rem; }
 }
