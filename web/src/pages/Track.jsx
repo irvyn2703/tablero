@@ -5,6 +5,13 @@ import { formatWhen, messageFrom } from '../lib/format'
 import { Thread } from '../components/Thread'
 import { Alert, Progress, useFeedback } from '../components/ui'
 
+function queueLine(ticket) {
+  if (typeof ticket.ahead !== 'number') return ''
+  if (ticket.ahead === 0) return 'Es el primero de este estado.'
+  const noun = ticket.ahead === 1 ? 'ticket' : 'tickets'
+  return `Ahora hay ${ticket.ahead} ${noun} antes que el tuyo en este estado.`
+}
+
 export function Track() {
   const { token } = useParams()
   const [ticket, setTicket] = useState(null)
@@ -38,6 +45,8 @@ export function Track() {
     }, 'Mensaje enviado.')
   }
 
+  const line = ticket ? queueLine(ticket) : ''
+
   if (!configured) return <main className="letter"><h1>Falta configurar Supabase.</h1></main>
 
   return (
@@ -49,6 +58,7 @@ export function Track() {
         <>
           <p className="quiet">{ticket.key || `#${ticket.number}`} · {ticket.status}</p>
           <Progress value={ticket.progress} />
+          {line && <p className="quiet">{line}</p>}
           <Thread
             messages={ticket.messages ?? []}
             canWrite

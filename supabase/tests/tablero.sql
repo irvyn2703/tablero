@@ -1,6 +1,6 @@
 begin;
 
-select plan(47);
+select plan(50);
 
 insert into public.companies (name, slug)
 values ('Acme', 'acme')
@@ -458,6 +458,36 @@ select throws_ok(
   ),
   'P0001',
   'el enlace de seguimiento no coincide'
+);
+
+select is(
+  public.read_public_ticket(repeat('a', 64)) -> 'ahead',
+  'null'::jsonb,
+  'un ticket listo no cuenta la fila'
+);
+
+select private.apply_progress(
+  :'ticket_id'::uuid,
+  (select id from public.statuses where company_id = :'company_id' and name = 'En cola'),
+  null
+);
+
+select is(
+  (public.read_public_ticket(repeat('a', 64)) ->> 'ahead')::int,
+  1,
+  'la liga cuenta los tickets de adelante en el mismo estado'
+);
+
+select private.apply_progress(
+  :'ticket_id'::uuid,
+  (select id from public.statuses where company_id = :'company_id' and name = 'Falta información'),
+  null
+);
+
+select is(
+  public.read_public_ticket(repeat('a', 64)) -> 'ahead',
+  'null'::jsonb,
+  'una pausa no cuenta la fila'
 );
 
 select is(private.file_mime('foto.PNG'), 'image/png', 'una imagen png');
