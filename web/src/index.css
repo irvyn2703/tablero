@@ -546,6 +546,13 @@ h2 { font-size: 1.45rem; margin: 0; }
 
 .release-head h1 { max-width: 16ch; }
 
+.release-forms {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.7rem;
+}
+
 .release-new {
   display: flex;
   align-items: flex-end;
@@ -556,7 +563,15 @@ h2 { font-size: 1.45rem; margin: 0; }
 
 .release-group { margin-bottom: 1.6rem; }
 
-.release-group > .kicker { margin-bottom: 0.55rem; }
+.release-lane {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.55rem;
+}
+
+.release-lane .kicker { margin: 0; }
 
 .releases {
   display: grid;
@@ -913,6 +928,7 @@ h2 { font-size: 1.45rem; margin: 0; }
     padding: 1.15rem 1rem max(2rem, env(safe-area-inset-bottom));
   }
   .release-head,
+  .release-forms,
   .release-new { display: flex; flex-direction: column; align-items: stretch; }
   .release-new .field { width: auto; }
   .releases { grid-template-columns: 1fr; }

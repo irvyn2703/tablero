@@ -12,6 +12,7 @@ export function Versions() {
   const [categories, setCategories] = useState([])
   const [tickets, setTickets] = useState([])
   const [name, setName] = useState('')
+  const [categoryName, setCategoryName] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [picked, setPicked] = useState({})
   const [error, setError] = useState('')
@@ -20,7 +21,7 @@ export function Versions() {
   async function load() {
     const [versionRes, categoryRes, ticketRes] = await Promise.all([
       supabase.from('versions').select('id, name, category_id, created_at').eq('company_id', companyId).order('created_at', { ascending: false }),
-      supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
+      supabase.from('version_categories').select('id, name').eq('company_id', companyId).order('name'),
       supabase.from('ticket_rows').select('id, public_number, title, status_kind, version_id, rank').eq('company_id', companyId).order('rank'),
     ])
     const failed = [versionRes, categoryRes, ticketRes].find((item) => item.error)
@@ -42,12 +43,51 @@ export function Versions() {
     return tickets.filter((ticket) => ticket.status_kind === 'close' && !ticket.version_id)
   }
 
+  async function addCategory(event) {
+    event.preventDefault()
+    await run('front', async () => {
+      setError('')
+      if (!categoryName.trim()) {
+        setError('La categoría lleva nombre.')
+        return false
+      }
+      const { data, error: insertError } = await supabase.from('version_categories').insert({
+        company_id: companyId,
+        name: categoryName.trim(),
+      }).select('id').single()
+      if (insertError) {
+        setError(insertError.code === '23505' ? 'Ya existe esa categoría de versión.' : messageFrom(insertError))
+        return false
+      }
+      setCategoryName('')
+      setCategoryId(data.id)
+      await load()
+    }, 'Categoría creada.')
+  }
+
+  function removeCategory(id) {
+    return run(`front-${id}`, async () => {
+      setError('')
+      const { error: deleteError } = await supabase
+        .from('version_categories')
+        .delete()
+        .eq('id', id)
+        .eq('company_id', companyId)
+      if (deleteError) {
+        setError(messageFrom(deleteError))
+        return false
+      }
+      if (categoryId === id) setCategoryId('')
+      await load()
+    }, 'Categoría quitada. Las versiones quedan sin categoría.')
+  }
+
   async function addVersion(event) {
     event.preventDefault()
     await run('add', async () => {
       setError('')
       if (!categoryId) {
-        setError('Elige la categoría. Así no se mezcla móvil con dash.')
+        setError('Elige la categoría de la versión. Así no se mezcla móvil con dash.')
         return false
       }
       if (!name.trim()) {
@@ -156,7 +196,7 @@ export function Versions() {
       name: 'Sin categoría',
       versions: versions.filter((version) => !version.category_id),
     },
-  ].filter((lane) => lane.versions.length)
+  ].filter((lane) => lane.key === 'none' ? lane.versions.length : true)
 
   return (
     <section className="page">
@@ -166,11 +206,27 @@ export function Versions() {
           <h1>Lo que salió en cada entrega.</h1>
         </div>
         {editable && (
+          <div className="release-forms">
+          <form className="release-new" onSubmit={addCategory}>
+            <label className="field">
+              <span>Categoría de versión</span>
+              <input
+                value={categoryName}
+                placeholder="Móvil, Dash"
+                maxLength={40}
+                onChange={(event) => setCategoryName(event.target.value)}
+                required
+              />
+            </label>
+            <ActionButton name="front" busy={busy} pending="Creando…" className="btn" type="submit">
+              Crear
+            </ActionButton>
+          </form>
           <form className="release-new" onSubmit={addVersion}>
             <label className="field">
               <span>Categoría</span>
               <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} required>
-                <option value="">{categories.length === 0 ? 'Crea una en el tablero' : 'Elegir'}</option>
+                <option value="">{categories.length === 0 ? 'Crea Móvil o Dash' : 'Elegir'}</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>{category.name}</option>
                 ))}
@@ -190,14 +246,32 @@ export function Versions() {
               Agregar
             </ActionButton>
           </form>
+          </div>
         )}
       </div>
+      <Done name="front" mark={mark}>{done}</Done>
+      <Done name={mark.startsWith('front-') ? mark : ''} mark={mark}>{done}</Done>
       <Done name="add" mark={mark}>{done}</Done>
       <Alert>{error}</Alert>
-      {versions.length === 0 && <p className="quiet">Todavía no hay versiones.</p>}
+      {versions.length === 0 && categories.length === 0 && <p className="quiet">Todavía no hay versiones.</p>}
       {lanes.map((lane) => (
       <section className="release-group" key={lane.key}>
-        <p className="kicker">{lane.name}</p>
+        <header className="release-lane">
+          <p className="kicker">{lane.name}</p>
+          {editable && lane.key !== 'none' && (
+            <ActionButton
+              name={`front-${lane.key}`}
+              busy={busy}
+              pending="…"
+              className="text-btn"
+              type="button"
+              onClick={() => removeCategory(lane.key)}
+            >
+              Quitar categoría
+            </ActionButton>
+          )}
+        </header>
+        {lane.versions.length === 0 && <p className="quiet">Todavía no hay versiones en {lane.name}.</p>}
       <div className="releases">
         {lane.versions.map((version) => {
           const held = inside(version.id)

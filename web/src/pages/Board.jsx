@@ -18,6 +18,7 @@ export function Board() {
   const [drop, setDrop] = useState(null)
   const [shown, setShown] = useState({})
   const [versions, setVersions] = useState([])
+  const [versionCategories, setVersionCategories] = useState([])
   const [categories, setCategories] = useState([])
   const [links, setLinks] = useState([])
   const [pickedCats, setPickedCats] = useState([])
@@ -66,14 +67,15 @@ export function Board() {
   })
 
   async function load() {
-    const [statusRes, ticketRes, versionRes, categoryRes, linkRes] = await Promise.all([
+    const [statusRes, ticketRes, versionRes, versionCategoryRes, categoryRes, linkRes] = await Promise.all([
       supabase.from('statuses').select('id, name, kind, position, weight, color, allows_delete').eq('company_id', companyId).order('position'),
       supabase.from('ticket_rows').select('id, public_number, title, status_id, progress, local_percent, priority, estimate, rank, version_id').eq('company_id', companyId).order('rank'),
       supabase.from('versions').select('id, name, category_id').eq('company_id', companyId),
+      supabase.from('version_categories').select('id, name').eq('company_id', companyId).order('name'),
       supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
       supabase.from('ticket_categories').select('ticket_id, category_id').eq('company_id', companyId),
     ])
-    const failed = [statusRes, ticketRes, versionRes, categoryRes, linkRes].find((item) => item.error)
+    const failed = [statusRes, ticketRes, versionRes, versionCategoryRes, categoryRes, linkRes].find((item) => item.error)
     if (failed) {
       setError(messageFrom(failed.error))
       return
@@ -81,6 +83,7 @@ export function Board() {
     setStatuses(statusRes.data ?? [])
     setTickets(ticketRes.data ?? [])
     setVersions(versionRes.data ?? [])
+    setVersionCategories(versionCategoryRes.data ?? [])
     setCategories(categoryRes.data ?? [])
     setLinks(linkRes.data ?? [])
   }
@@ -233,7 +236,7 @@ export function Board() {
     if (!ticket.version_id) return ''
     const version = versions.find((item) => item.id === ticket.version_id)
     if (!version) return ''
-    const category = categories.find((item) => item.id === version.category_id)
+    const category = versionCategories.find((item) => item.id === version.category_id)
     return category ? `${category.name} ${version.name}` : version.name
   }
 
