@@ -34,25 +34,47 @@ function StoryLine({ ticket, company, extra, done }) {
 }
 
 function Bucket({ title, tickets, company, done, extraFor }) {
+  if (!tickets.length) return null
   return (
     <div>
       <span className="quiet">{title}</span>
-      {tickets.length === 0
-        ? <div className="quiet">—</div>
-        : (
-          <ul className="sprint-tickets">
-            {tickets.map((ticket) => (
-              <StoryLine
-                key={ticket.id}
-                ticket={ticket}
-                company={company}
-                done={done}
-                extra={extraFor ? extraFor(ticket) : ''}
-              />
-            ))}
-          </ul>
-        )}
+      <ul className="sprint-tickets">
+        {tickets.map((ticket) => (
+          <StoryLine
+            key={ticket.id}
+            ticket={ticket}
+            company={company}
+            done={done}
+            extra={extraFor ? extraFor(ticket) : ''}
+          />
+        ))}
+      </ul>
     </div>
+  )
+}
+
+function ticketKeys(tickets, company) {
+  return tickets.map((ticket) => ticketKey(company.ticket_prefix, ticket.public_number))
+}
+
+function BarMarks({ buckets, company }) {
+  const groups = [
+    ['open', 'Comprometido', buckets.open],
+    ['done', 'Completo', buckets.done],
+    ['carried', 'Sigue', buckets.carried],
+  ].filter(([, , tickets]) => tickets.length)
+  if (!groups.length) return null
+  return (
+    <span className="bar-marks">
+      {groups.map(([key, title, tickets]) => (
+        <span key={key} className={`bar-mark mark-${key}`}>
+          <span className="bar-mark-name">{title}</span>
+          {tickets.map((ticket) => (
+            <span key={ticket.id} className="closed-key">{ticketKey(company.ticket_prefix, ticket.public_number)}</span>
+          ))}
+        </span>
+      ))}
+    </span>
   )
 }
 
@@ -81,17 +103,17 @@ function laneTone(categoryName) {
 }
 
 function SprintDetail({ sprint, span, buckets, tone, editable, company, sprintById }) {
-  const counted = buckets.open.length + buckets.done.length + buckets.carried.length
+  const filled = [buckets.open, buckets.done, buckets.carried].filter((tickets) => tickets.length).length
   return (
     <div className={`bar-detail tone-${tone}`}>
       <div className="cluster">
         <strong>{span || sprint.name}</strong>
         {editable && <Link className="text-btn" to={`s/${sprint.id}`}>Editar</Link>}
       </div>
-      {counted === 0
+      {filled === 0
         ? <div className="quiet">Sin tickets. Asígnale este sprint en la ficha.</div>
         : (
-          <div className="sprint-buckets">
+          <div className={`sprint-buckets cols-${filled}`}>
             <Bucket title="Comprometido" tickets={buckets.open} company={company} />
             <Bucket title="Completo" tickets={buckets.done} company={company} done />
             <Bucket
@@ -275,9 +297,9 @@ export function Calendar() {
                 const label = [
                   story.span || sprint.name,
                   story.size,
-                  `${story.buckets.open.length} comprometido`,
-                  `${story.buckets.done.length} completo`,
-                  `${story.buckets.carried.length} sigue`,
+                  story.buckets.open.length ? `comprometido ${ticketKeys(story.buckets.open, company).join(' ')}` : '',
+                  story.buckets.done.length ? `completo ${ticketKeys(story.buckets.done, company).join(' ')}` : '',
+                  story.buckets.carried.length ? `sigue ${ticketKeys(story.buckets.carried, company).join(' ')}` : '',
                 ].filter(Boolean).join(', ')
                 return (
                   <button
@@ -291,11 +313,7 @@ export function Calendar() {
                   >
                     <span className="bar-when">{story.span || sprint.name}</span>
                     {story.size && <span className="bar-size">{story.size}</span>}
-                    <span className="bar-counts" aria-hidden="true">
-                      <span className="count-open">{story.buckets.open.length}</span>
-                      <span className="count-done">{story.buckets.done.length}</span>
-                      <span className="count-carried">{story.buckets.carried.length}</span>
-                    </span>
+                    <BarMarks buckets={story.buckets} company={company} />
                   </button>
                 )
               })}

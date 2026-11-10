@@ -130,10 +130,13 @@
 
 .sprint-buckets {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.85rem;
   margin-top: 0.7rem;
 }
+
+.sprint-buckets.cols-1 { grid-template-columns: minmax(0, 1fr); }
+.sprint-buckets.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sprint-buckets.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 .sprint-buckets > div,
 .sprint-tickets,
@@ -191,23 +194,32 @@ button.bar {
   white-space: nowrap;
 }
 
-.bar-counts {
+.bar-marks {
   display: flex;
   flex: 1 0 100%;
-  gap: 0.55rem;
-  font-variant-numeric: tabular-nums;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
 }
 
-.bar-counts span + span::before {
-  content: "·";
-  margin-right: 0.55rem;
+.bar-mark {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.12rem 0.4rem;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.bar-mark-name {
   color: var(--muted);
-  font-weight: 400;
+  font-weight: 500;
 }
 
-.bar.tone-pine .count-done { color: var(--brass); }
-.bar.tone-brass .count-done { font-weight: 700; }
-.count-carried { color: var(--muted); }
+.bar-mark .closed-key { font-weight: 700; }
+.mark-done,
+.mark-done .bar-mark-name { color: var(--brass); }
+.mark-carried,
+.mark-carried .bar-mark-name { color: var(--muted); }
 
 .bar-detail {
   display: block;
@@ -298,6 +310,7 @@ button.bar {
     text-align: center;
   }
   .day .mark { align-items: center; text-align: center; }
-  .sprint-buckets { grid-template-columns: 1fr; }
+  .sprint-buckets.cols-2,
+  .sprint-buckets.cols-3 { grid-template-columns: 1fr; }
   .bar { min-width: 0; padding: 0.2rem 0.3rem; }
 }
