@@ -58,7 +58,7 @@ export function Ticket() {
       supabase.from('company_members').select('user_id, alias').eq('company_id', companyId),
       supabase.from('sprints').select('id, name, starts_on, ends_on').eq('company_id', companyId).order('starts_on'),
       supabase.from('versions').select('id, name').eq('company_id', companyId).order('created_at', { ascending: false }),
-      supabase.from('repos').select('id, github_full_name, default_branch').eq('company_id', companyId),
+      supabase.from('repos').select('id, github_full_name, source_branch, default_branch').eq('company_id', companyId),
       supabase.from('ticket_repos').select('repo_id').eq('ticket_id', ticketId),
       supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
       supabase.from('ticket_categories').select('category_id').eq('ticket_id', ticketId),
@@ -335,7 +335,7 @@ export function Ticket() {
                   ))}
                 />
                 <span>{repo.github_full_name}</span>
-                <span className="quiet">{repo.default_branch}</span>
+                <span className="quiet">{repo.source_branch} → {repo.default_branch}</span>
               </label>
             ))}
         </div>

@@ -1,6 +1,6 @@
 begin;
 
-select plan(44);
+select plan(47);
 
 insert into public.companies (name, slug)
 values ('Acme', 'acme')
@@ -267,6 +267,26 @@ select is(
   jsonb_array_length(public.agent_inbox('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa') -> 'catalog'),
   2,
   'el estado inicial trae el catálogo'
+);
+
+select is(
+  (public.agent_inbox('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa') -> 'catalog' -> 0 ->> 'fromBranch'),
+  'main',
+  'la rama nace de main'
+);
+
+select is(
+  (public.agent_inbox('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa') -> 'catalog' -> 0 ->> 'pullBranch'),
+  'develop',
+  'el pull apunta a develop'
+);
+
+select ok(
+  not pg_catalog.jsonb_exists(
+    public.agent_inbox('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa') -> 'catalog' -> 0,
+    'baseBranch'
+  ),
+  'el catálogo ya no mezcla las dos ramas'
 );
 
 select is(

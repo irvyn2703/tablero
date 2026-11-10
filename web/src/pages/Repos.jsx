@@ -9,12 +9,13 @@ export function Repos() {
   const { role } = useOutletContext()
   const [repos, setRepos] = useState([])
   const [name, setName] = useState('')
+  const [source, setSource] = useState('main')
   const [branch, setBranch] = useState('develop')
   const [error, setError] = useState('')
   const { busy, done, mark, run } = useFeedback()
 
   async function load() {
-    const { data, error: loadError } = await supabase.from('repos').select('id, github_full_name, default_branch').eq('company_id', companyId)
+    const { data, error: loadError } = await supabase.from('repos').select('id, github_full_name, source_branch, default_branch').eq('company_id', companyId)
     if (loadError) setError(messageFrom(loadError))
     else setRepos(data ?? [])
   }
@@ -28,6 +29,7 @@ export function Repos() {
       const { error: insertError } = await supabase.from('repos').insert({
         company_id: companyId,
         github_full_name: name,
+        source_branch: source,
         default_branch: branch,
       })
       if (insertError) {
@@ -44,24 +46,28 @@ export function Repos() {
   return (
     <section className="page">
       <p className="kicker">Repos</p>
-      <h1>Dónde se abre el pull.</h1>
+      <h1>De dónde nace la rama y a dónde entra el pull.</h1>
       <Alert>{error}</Alert>
       <div className="list">
         {repos.map((repo) => (
           <article className="panel" key={repo.id}>
             <strong>{repo.github_full_name}</strong>
-            <div className="quiet">Rama base {repo.default_branch}</div>
+            <div className="quiet">Nace de {repo.source_branch}. El pull apunta a {repo.default_branch}.</div>
           </article>
         ))}
       </div>
       <form className="panel" onSubmit={add} style={{ marginTop: '1rem' }}>
-        <div className="grid-2">
+        <div className="grid-3">
           <label className="field">
             <span>GitHub</span>
             <input value={name} placeholder="org/repo" onChange={(event) => setName(event.target.value)} required />
           </label>
           <label className="field">
-            <span>Rama base</span>
+            <span>Nace de</span>
+            <input value={source} onChange={(event) => setSource(event.target.value)} required />
+          </label>
+          <label className="field">
+            <span>El pull apunta a</span>
             <input value={branch} onChange={(event) => setBranch(event.target.value)} required />
           </label>
         </div>

@@ -22,7 +22,7 @@ const server = new McpServer({
     'Antes de decidir, search con palabras del título para ver si ya existe. Si otro ticket abierto describe lo mismo, dilo en la nota y deja autonomy en human.',
     'Comprueba en el repo si el error existe, o si el requerimiento ya está resuelto.',
     'Marca los repos con assign_repos y la complejidad con suggest.',
-    'Si next es abrir pull, reserva con claim, abre la rama con la clave, registra el pull con attach_pr y al final pasa thermos. No lo mezcles.',
+    'Si next es abrir pull, reserva con claim. La rama nace de fromBranch y el pull apunta a pullBranch: abre la rama con la clave desde fromBranch y crea el pull hacia pullBranch. Regístralo con attach_pr y al final pasa thermos. No lo mezcles.',
     'Si next es solo sugerir, no abras el pull.',
     'Cuando termines, claim si no lo reservaste y move el ticket al estado que te pidan. Si dicen asignación de prioridad, el estado es asignación de prioridad. Después release.',
   ].join(' '),
@@ -48,7 +48,7 @@ async function call(fn, args) {
 
 server.tool(
   'inbox',
-  'Lee los tickets de un estado y el catálogo de repos de la empresa. status es el nombre o un pedazo, por ejemplo revisión o asignación de prioridad. Si lo omites, lee el primero del flujo.',
+  'Lee los tickets de un estado y el catálogo de repos de la empresa. status es el nombre o un pedazo, por ejemplo revisión o asignación de prioridad. Si lo omites, lee el primero del flujo. Cada repo trae fromBranch, de donde nace la rama, y pullBranch, a donde apunta el pull.',
   { status: z.string().optional() },
   async ({ status }) => call('agent_inbox', { p_status: status ?? null }),
 )
@@ -75,7 +75,7 @@ server.tool(
 
 server.tool(
   'suggest',
-  'Guarda prioridad, tamaño y autonomía de un ticket que sigue en trabajo. priority va de 1 urgente a 4 baja. estimate es xs, s, m o l. autonomy es suggest, pull o human. Si la respuesta dice abrir pull, resérvalo, abre la rama con su clave, registra el pull y al final pasa thermos. Si dice solo sugerir, no abras el pull.',
+  'Guarda prioridad, tamaño y autonomía de un ticket que sigue en trabajo. priority va de 1 urgente a 4 baja. estimate es xs, s, m o l. autonomy es suggest, pull o human. Si la respuesta dice abrir pull, la rama nace de fromBranch y el pull apunta a pullBranch: resérvalo, abre la rama con su clave desde fromBranch, crea el pull hacia pullBranch, regístralo y al final pasa thermos. Si dice solo sugerir, no abras el pull.',
   {
     ticket_id: z.string().uuid(),
     priority: z.number().int().min(1).max(4),
@@ -94,7 +94,7 @@ server.tool(
 
 server.tool(
   'recommend',
-  'Recomienda qué ticket atender en toda la cola de trabajo. Para el estado inicial usa inbox. key es el nombre de la rama. El ticket puede traer varios repos. Si el primero dice ejecutar, puedes tomarlo y abrir un pull en cada repo. Si dice sugerir, solo proponlo.',
+  'Recomienda qué ticket atender en toda la cola de trabajo. Para el estado inicial usa inbox. key es el nombre de la rama. El ticket puede traer varios repos. Si el primero dice ejecutar, la rama nace de fromBranch y el pull apunta a pullBranch. Si dice sugerir, solo proponlo.',
   {},
   async () => call('agent_recommend', {}),
 )
