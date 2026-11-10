@@ -554,6 +554,10 @@ h2 { font-size: 1.45rem; margin: 0; }
 
 .release-new .field { width: 14rem; }
 
+.release-group { margin-bottom: 1.6rem; }
+
+.release-group > .kicker { margin-bottom: 0.55rem; }
+
 .releases {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(18rem, 26rem));

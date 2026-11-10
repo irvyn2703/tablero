@@ -69,7 +69,7 @@ export function Board() {
     const [statusRes, ticketRes, versionRes, categoryRes, linkRes] = await Promise.all([
       supabase.from('statuses').select('id, name, kind, position, weight, color, allows_delete').eq('company_id', companyId).order('position'),
       supabase.from('ticket_rows').select('id, public_number, title, status_id, progress, local_percent, priority, estimate, rank, version_id').eq('company_id', companyId).order('rank'),
-      supabase.from('versions').select('id, name').eq('company_id', companyId),
+      supabase.from('versions').select('id, name, category_id').eq('company_id', companyId),
       supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
       supabase.from('ticket_categories').select('ticket_id, category_id').eq('company_id', companyId),
     ])
@@ -231,7 +231,10 @@ export function Board() {
 
   function versionOf(ticket) {
     if (!ticket.version_id) return ''
-    return versions.find((version) => version.id === ticket.version_id)?.name || ''
+    const version = versions.find((item) => item.id === ticket.version_id)
+    if (!version) return ''
+    const category = categories.find((item) => item.id === version.category_id)
+    return category ? `${category.name} ${version.name}` : version.name
   }
 
   function categoriesOf(ticketId) {

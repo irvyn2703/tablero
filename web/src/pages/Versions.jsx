@@ -9,21 +9,25 @@ export function Versions() {
   const { company, role } = useOutletContext()
   const editable = canEdit(role)
   const [versions, setVersions] = useState([])
+  const [categories, setCategories] = useState([])
   const [tickets, setTickets] = useState([])
   const [name, setName] = useState('')
+  const [categoryId, setCategoryId] = useState('')
   const [picked, setPicked] = useState({})
   const [error, setError] = useState('')
   const { busy, done, mark, run } = useFeedback()
 
   async function load() {
-    const [versionRes, ticketRes] = await Promise.all([
-      supabase.from('versions').select('id, name, created_at').eq('company_id', companyId).order('created_at', { ascending: false }),
+    const [versionRes, categoryRes, ticketRes] = await Promise.all([
+      supabase.from('versions').select('id, name, category_id, created_at').eq('company_id', companyId).order('created_at', { ascending: false }),
+      supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
       supabase.from('ticket_rows').select('id, public_number, title, status_kind, version_id, rank').eq('company_id', companyId).order('rank'),
     ])
-    const failed = [versionRes, ticketRes].find((item) => item.error)
+    const failed = [versionRes, categoryRes, ticketRes].find((item) => item.error)
     if (failed) setError(messageFrom(failed.error))
     else {
       setVersions(versionRes.data ?? [])
+      setCategories(categoryRes.data ?? [])
       setTickets(ticketRes.data ?? [])
     }
   }
@@ -42,6 +46,10 @@ export function Versions() {
     event.preventDefault()
     await run('add', async () => {
       setError('')
+      if (!categoryId) {
+        setError('Elige la categoría. Así no se mezcla móvil con dash.')
+        return false
+      }
       if (!name.trim()) {
         setError('La versión lleva nombre.')
         return false
@@ -49,9 +57,10 @@ export function Versions() {
       const { error: insertError } = await supabase.from('versions').insert({
         company_id: companyId,
         name: name.trim(),
+        category_id: categoryId,
       })
       if (insertError) {
-        setError(insertError.code === '23505' ? 'Ya existe una versión con ese nombre.' : messageFrom(insertError))
+        setError(insertError.code === '23505' ? 'Ya existe esa versión en esa categoría.' : messageFrom(insertError))
         return false
       }
       setName('')
@@ -94,6 +103,22 @@ export function Versions() {
     }, 'Ticket fuera de la versión.')
   }
 
+  function moveCategory(versionId, nextCategoryId) {
+    return run(`category-${versionId}`, async () => {
+      setError('')
+      const { error: updateError } = await supabase
+        .from('versions')
+        .update({ category_id: nextCategoryId || null })
+        .eq('id', versionId)
+        .eq('company_id', companyId)
+      if (updateError) {
+        setError(updateError.code === '23505' ? 'Ya existe esa versión en esa categoría.' : messageFrom(updateError))
+        return false
+      }
+      await load()
+    }, 'Categoría guardada.')
+  }
+
   function removeVersion(versionId) {
     return run(`remove-${versionId}`, async () => {
       setError('')
@@ -120,6 +145,18 @@ export function Versions() {
   }
 
   const loose = available()
+  const lanes = [
+    ...categories.map((category) => ({
+      key: category.id,
+      name: category.name,
+      versions: versions.filter((version) => version.category_id === category.id),
+    })),
+    {
+      key: 'none',
+      name: 'Sin categoría',
+      versions: versions.filter((version) => !version.category_id),
+    },
+  ].filter((lane) => lane.versions.length)
 
   return (
     <section className="page">
@@ -130,6 +167,15 @@ export function Versions() {
         </div>
         {editable && (
           <form className="release-new" onSubmit={addVersion}>
+            <label className="field">
+              <span>Categoría</span>
+              <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} required>
+                <option value="">{categories.length === 0 ? 'Crea una en el tablero' : 'Elegir'}</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
+              </select>
+            </label>
             <label className="field">
               <span>Nueva versión</span>
               <input
@@ -149,15 +195,33 @@ export function Versions() {
       <Done name="add" mark={mark}>{done}</Done>
       <Alert>{error}</Alert>
       {versions.length === 0 && <p className="quiet">Todavía no hay versiones.</p>}
+      {lanes.map((lane) => (
+      <section className="release-group" key={lane.key}>
+        <p className="kicker">{lane.name}</p>
       <div className="releases">
-        {versions.map((version) => {
+        {lane.versions.map((version) => {
           const held = inside(version.id)
           const count = held.length === 1 ? '1 ticket' : `${held.length} tickets`
           return (
             <article className="release" key={version.id}>
               <header>
                 <div>
-                  <p className="kicker">Versión</p>
+                  {editable
+                    ? (
+                      <label className="field">
+                        <span className="quiet">Categoría</span>
+                        <select
+                          value={version.category_id || ''}
+                          onChange={(event) => moveCategory(version.id, event.target.value)}
+                        >
+                          <option value="">Sin categoría</option>
+                          {categories.map((category) => (
+                            <option key={category.id} value={category.id}>{category.name}</option>
+                          ))}
+                        </select>
+                      </label>
+                    )
+                    : <p className="kicker">{lane.name}</p>}
                   <h2>{version.name}</h2>
                 </div>
                 <span className="release-count">{count}</span>
@@ -232,6 +296,8 @@ export function Versions() {
           )
         })}
       </div>
+      </section>
+      ))}
     </section>
   )
 }
