@@ -316,7 +316,7 @@ export function Calendar() {
               {bars.map(({ sprint, placed, story }) => {
                 const open = openBar?.sprint.id === sprint.id
                 const label = [
-                  story.span || sprint.name,
+                  [sprint.name, story.span].filter((part, index, list) => part && list.indexOf(part) === index).join(' '),
                   story.size,
                   story.buckets.open.length ? `comprometido ${ticketKeys(story.buckets.open, company).join(' ')}` : '',
                   story.buckets.done.length ? `completo ${ticketKeys(story.buckets.done, company).join(' ')}` : '',
@@ -332,7 +332,10 @@ export function Calendar() {
                     aria-label={label}
                     onClick={() => setOpenSprintId(open ? null : `${sprint.id}:${weekKey}`)}
                   >
-                    <span className="bar-when">{story.span || sprint.name}</span>
+                    <span className="bar-when">
+                      <span className="bar-sprint">{sprint.name || story.span}</span>
+                      {story.span && story.span !== sprint.name && <span className="bar-span">{story.span}</span>}
+                    </span>
                     {story.size && <span className="bar-size">{story.size}</span>}
                     <BarMarks buckets={story.buckets} company={company} />
                   </button>

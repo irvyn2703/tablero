@@ -179,9 +179,24 @@ button.bar {
 .bar.is-open { box-shadow: inset 0 0 0 1px currentColor; }
 
 .bar-when {
-  font-weight: 700;
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.bar-sprint {
+  min-width: 0;
   overflow: hidden;
+  font-weight: 700;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-span {
+  flex: none;
+  color: var(--muted);
+  font-weight: 500;
   white-space: nowrap;
 }
 
