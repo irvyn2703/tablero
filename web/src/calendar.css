@@ -265,10 +265,33 @@ button.bar {
 
 .sprint-tickets li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(5.5rem, 7.5rem);
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 8.5rem) minmax(5.5rem, 7.5rem);
   align-items: center;
   column-gap: 0.75rem;
   min-width: 0;
+}
+
+.story-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 0.78rem;
+}
+
+.story-status span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-dot {
+  flex: none;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
 }
 
 .story-line {
@@ -356,8 +379,12 @@ button.bar {
   .sprint-buckets.cols-2,
   .sprint-buckets.cols-3 { grid-template-columns: 1fr; }
   .sprint-tickets li {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     row-gap: 0.2rem;
   }
+  .sprint-tickets li > :first-child,
+  .sprint-tickets .chips { grid-column: 1 / -1; }
+  .story-status { grid-column: 1; }
+  .sprint-tickets .meter { grid-column: 2; }
   .bar { min-width: 0; padding: 0.2rem 0.3rem; }
 }
