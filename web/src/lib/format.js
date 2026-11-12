@@ -38,6 +38,11 @@ export function memberName(member) {
   return alias || 'Sin nombre'
 }
 
+export function assigneeLabel(byId, assigneeId) {
+  if (!assigneeId) return 'Sin asignar'
+  return byId.get(assigneeId) ?? 'Sin asignar'
+}
+
 export const roleLabel = {
   owner: 'Dueño',
   admin: 'Admin',

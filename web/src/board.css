@@ -86,6 +86,14 @@
 
 .card-body { display: block; }
 
+.card-who {
+  display: block;
+  margin: 0.15rem 0 0.45rem;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
 .card-body p {
   margin: 0.28rem 0 0.55rem;
   font-family: var(--serif);

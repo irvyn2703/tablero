@@ -1,7 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { canEdit, laneVars, messageFrom, ticketKey } from '../lib/format'
+import { assigneeLabel, canEdit, laneVars, memberName, messageFrom, ticketKey } from '../lib/format'
 import { discardTicket } from '../lib/files'
 import { ActionButton, Alert, Done, Progress, TicketChips, useFeedback } from '../components/ui'
 
@@ -21,6 +21,7 @@ export function Board() {
   const [versionCategories, setVersionCategories] = useState([])
   const [categories, setCategories] = useState([])
   const [links, setLinks] = useState([])
+  const [members, setMembers] = useState([])
   const [pickedCats, setPickedCats] = useState([])
   const [categoryName, setCategoryName] = useState('')
   const dragRef = useRef(null)
@@ -67,15 +68,16 @@ export function Board() {
   })
 
   async function load() {
-    const [statusRes, ticketRes, versionRes, versionCategoryRes, categoryRes, linkRes] = await Promise.all([
+    const [statusRes, ticketRes, versionRes, versionCategoryRes, categoryRes, linkRes, memberRes] = await Promise.all([
       supabase.from('statuses').select('id, name, kind, position, weight, color, allows_delete').eq('company_id', companyId).order('position'),
-      supabase.from('ticket_rows').select('id, public_number, title, status_id, progress, local_percent, priority, estimate, rank, version_id').eq('company_id', companyId).order('rank'),
+      supabase.from('ticket_rows').select('id, public_number, title, status_id, progress, local_percent, priority, estimate, rank, version_id, assignee_id').eq('company_id', companyId).order('rank'),
       supabase.from('versions').select('id, name, category_id').eq('company_id', companyId),
       supabase.from('version_categories').select('id, name').eq('company_id', companyId).order('name'),
       supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
       supabase.from('ticket_categories').select('ticket_id, category_id').eq('company_id', companyId),
+      supabase.from('company_members').select('user_id, alias').eq('company_id', companyId),
     ])
-    const failed = [statusRes, ticketRes, versionRes, versionCategoryRes, categoryRes, linkRes].find((item) => item.error)
+    const failed = [statusRes, ticketRes, versionRes, versionCategoryRes, categoryRes, linkRes, memberRes].find((item) => item.error)
     if (failed) {
       setError(messageFrom(failed.error))
       return
@@ -86,6 +88,7 @@ export function Board() {
     setVersionCategories(versionCategoryRes.data ?? [])
     setCategories(categoryRes.data ?? [])
     setLinks(linkRes.data ?? [])
+    setMembers(memberRes.data ?? [])
   }
 
   useEffect(() => {
@@ -231,6 +234,11 @@ export function Board() {
       load()
     }, 'Ticket eliminado.')
   }
+
+  const assigneeById = useMemo(
+    () => new Map(members.map((member) => [member.user_id, memberName(member)])),
+    [members],
+  )
 
   function versionOf(ticket) {
     if (!ticket.version_id) return ''
@@ -432,6 +440,7 @@ export function Board() {
                 <Link className="card-body" to={`t/${ticket.id}`}>
                   {versionOf(ticket) && <span className="card-version">{versionOf(ticket)}</span>}
                   <p>{ticket.title}</p>
+                  <span className="card-who quiet">{assigneeLabel(assigneeById, ticket.assignee_id)}</span>
                   {categoriesOf(ticket.id).length > 0 && (
                     <span className="card-cats">
                       {categoriesOf(ticket.id).map((category) => (

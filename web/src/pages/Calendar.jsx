@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { groupDayMarks, marksByDay } from '../lib/calendarMarks'
-import { canEdit, formatProgress, laneVars, localDateKey, memberName, messageFrom, sprintSpan, ticketKey } from '../lib/format'
+import { assigneeLabel, canEdit, formatProgress, laneVars, localDateKey, memberName, messageFrom, sprintSpan, ticketKey } from '../lib/format'
 import { bucketStays, objectiveLanes, sizeLine } from '../lib/sprintStory'
 import { Alert, Progress, TicketChips } from '../components/ui'
 
@@ -241,8 +241,7 @@ export function Calendar() {
   const title = new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' }).format(new Date(cursor.year, cursor.month, 1))
 
   function assigneeOf(ticket) {
-    if (!ticket.assignee_id) return 'Sin asignar'
-    return assigneeById.get(ticket.assignee_id) ?? 'Sin asignar'
+    return assigneeLabel(assigneeById, ticket.assignee_id)
   }
 
   function statusOf(ticket) {
