@@ -276,8 +276,15 @@ button.bar {
   align-items: center;
   gap: 0.35rem;
   min-width: 0;
-  color: var(--ink);
-  font-size: 0.78rem;
+  max-width: 100%;
+  padding: 0.16rem 0.5rem 0.16rem 0.38rem;
+  border-radius: 999px;
+  background: var(--lane, var(--paper-deep));
+  color: var(--lane-ink, var(--ink));
+  border: 1px solid color-mix(in srgb, var(--lane-ink, var(--ink)) 28%, transparent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .story-status span:last-child {
@@ -288,10 +295,13 @@ button.bar {
 }
 
 .status-dot {
+  display: block;
   flex: none;
-  width: 0.45rem;
-  height: 0.45rem;
+  width: 0.55rem;
+  height: 0.55rem;
   border-radius: 50%;
+  background: currentColor;
+  box-shadow: inset 0 0 0 2px var(--lane, var(--paper));
 }
 
 .story-line {

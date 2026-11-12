@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { groupDayMarks, marksByDay } from '../lib/calendarMarks'
-import { canEdit, formatProgress, hexColor, localDateKey, memberName, messageFrom, sprintSpan, ticketKey } from '../lib/format'
+import { canEdit, formatProgress, laneVars, localDateKey, memberName, messageFrom, sprintSpan, ticketKey } from '../lib/format'
 import { bucketStays, objectiveLanes, sizeLine } from '../lib/sprintStory'
 import { Alert, Progress, TicketChips } from '../components/ui'
 
@@ -36,8 +36,8 @@ function StoryLine({ ticket, company, assignee, extra, done, status }) {
         </span>
       </Link>
       <TicketChips priority={ticket.priority} estimate={ticket.estimate} />
-      <span className="story-status" title={name}>
-        <span className="status-dot" style={{ background: hexColor(status?.color) }} aria-hidden="true" />
+      <span className="story-status" style={laneVars(status?.color)} title={name}>
+        <span className="status-dot" aria-hidden="true" />
         <span>{name}</span>
       </span>
       <Progress value={ticket.progress} />
