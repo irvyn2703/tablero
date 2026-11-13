@@ -238,21 +238,57 @@ export function Board() {
     setDrop(null)
   }
 
+  function dropTarget(event, drag) {
+    const board = boardRef.current
+    if (board) {
+      const rect = board.getBoundingClientRect()
+      if (event.clientX < rect.left + 56) board.scrollLeft -= 18
+      else if (event.clientX > rect.right - 56) board.scrollLeft += 18
+    }
+    const stack = document.elementsFromPoint(event.clientX, event.clientY)
+    const hit = stack.find((node) => !node.closest?.(`[data-ticket="${drag.id}"]`))
+    const columnEl = hit?.closest?.('[data-column]')
+    if (!columnEl) return null
+    const statusId = columnEl.dataset.column
+    const cards = [...columnEl.querySelectorAll('[data-ticket]')].filter((node) => node.dataset.ticket !== drag.id)
+    const y = event.clientY
+    if (cards.length === 0) {
+      return statusId === drag.statusId ? null : { statusId, targetId: null, before: false }
+    }
+    if (y < cards[0].getBoundingClientRect().top) {
+      return statusId === drag.statusId ? null : { statusId, targetId: cards[0].dataset.ticket, before: true }
+    }
+    for (const card of cards) {
+      const rect = card.getBoundingClientRect()
+      const margin = Number.parseFloat(getComputedStyle(card).marginBottom) || 0
+      if (y > rect.bottom + margin) continue
+      return {
+        statusId,
+        targetId: card.dataset.ticket,
+        before: y < rect.top + rect.height / 2,
+      }
+    }
+    if (statusId === drag.statusId) return null
+    const ordered = tickets
+      .filter((item) => item.status_id === statusId)
+      .sort((a, b) => a.rank - b.rank)
+    const lastMounted = cards[cards.length - 1].dataset.ticket
+    const lastTicket = ordered[ordered.length - 1]?.id
+    if (lastMounted === lastTicket) return { statusId, targetId: null, before: false }
+    return { statusId, targetId: lastMounted, before: false }
+  }
+
   function trackDrag(event) {
     const drag = dragRef.current
     if (!drag) return
-    const hit = document.elementFromPoint(event.clientX, event.clientY)
-    const card = hit?.closest?.('[data-ticket]')
-    const sameColumn = card && card.dataset.status === drag.statusId && card.dataset.ticket !== drag.id
-    const next = sameColumn
-      ? {
-          id: card.dataset.ticket,
-          before: event.clientY < card.getBoundingClientRect().top + card.getBoundingClientRect().height / 2,
-        }
-      : null
+    const next = dropTarget(event, drag)
     drag.over = next
     setDrop((current) => {
-      if (current?.id === next?.id && current?.before === next?.before) return current
+      if (
+        current?.statusId === next?.statusId
+        && current?.targetId === next?.targetId
+        && current?.before === next?.before
+      ) return current
       return next
     })
   }
@@ -262,7 +298,71 @@ export function Board() {
     dragRef.current = null
     setDraggingId('')
     setDrop(null)
-    if (drag?.over) place(drag.id, drag.over.id, drag.over.before)
+    const over = drag?.over
+    if (!over) return
+    if (over.statusId === drag.statusId) {
+      if (over.targetId) place(drag.id, over.targetId, over.before)
+      return
+    }
+    relocate(drag.id, over)
+  }
+
+  function relocate(ticketId, over) {
+    return run('move', async () => {
+      setError('')
+      const column = tickets
+        .filter((item) => item.status_id === over.statusId && item.id !== ticketId)
+        .sort((a, b) => a.rank - b.rank)
+      const targetId = over.targetId || column[column.length - 1]?.id || ''
+      const before = over.targetId ? over.before : false
+      setTickets((current) => {
+        const ticket = current.find((item) => item.id === ticketId)
+        if (!ticket) return current
+        let rank = ticket.rank
+        if (targetId) {
+          const index = column.findIndex((item) => item.id === targetId)
+          const neighbor = column[index]
+          const other = before ? column[index - 1] : column[index + 1]
+          if (neighbor) {
+            const edge = before ? (other ? other.rank : neighbor.rank - 1) : neighbor.rank
+            const far = before ? neighbor.rank : (other ? other.rank : neighbor.rank + 1)
+            rank = (edge + far) / 2
+          }
+        } else if (column.length) {
+          rank = column[column.length - 1].rank + 1
+        }
+        return current.map((item) => (
+          item.id === ticketId ? { ...item, status_id: over.statusId, rank } : item
+        ))
+      })
+      const { error: moveError } = await supabase.rpc('set_ticket_progress', {
+        p_ticket_id: ticketId,
+        p_status_id: over.statusId,
+        p_local: null,
+      })
+      if (moveError) {
+        setError(messageFrom(moveError))
+        load()
+        return false
+      }
+      if (targetId) {
+        const { error: placeError } = await supabase.rpc('place_ticket', {
+          p_ticket_id: ticketId,
+          p_target_id: targetId,
+          p_before: before,
+        })
+        if (placeError) {
+          setError(messageFrom(placeError))
+          load()
+          return false
+        }
+      }
+      const index = targetId
+        ? column.findIndex((item) => item.id === targetId) + (before ? 0 : 1)
+        : column.length
+      showThrough(over.statusId, Math.max(index, 0))
+      load()
+    }, 'Ticket movido.')
   }
 
   function discard(ticket) {
@@ -439,7 +539,12 @@ export function Board() {
           const visible = columnTickets.slice(0, limit)
           const hidden = columnTickets.length - visible.length
           return (
-          <section className="column" style={laneVars(status.color)} key={status.id}>
+          <section
+            className={drop?.statusId === status.id && !drop.targetId ? 'column is-drop' : 'column'}
+            style={laneVars(status.color)}
+            data-column={status.id}
+            key={status.id}
+          >
             <header>
               <strong>{status.name}</strong>
               <span className="quiet">
@@ -457,7 +562,7 @@ export function Board() {
                 className={[
                   'card',
                   draggingId === ticket.id ? 'is-dragging' : '',
-                  drop?.id === ticket.id ? (drop.before ? 'is-drop-before' : 'is-drop-after') : '',
+                  drop?.targetId === ticket.id ? (drop.before ? 'is-drop-before' : 'is-drop-after') : '',
                 ].filter(Boolean).join(' ')}
                 data-ticket={ticket.id}
                 data-status={status.id}
@@ -476,7 +581,7 @@ export function Board() {
                       className="btn quiet grip"
                       type="button"
                       aria-label="Arrastrar"
-                      disabled={Boolean(busy) || visible.length < 2}
+                      disabled={Boolean(busy)}
                       onPointerDown={(event) => startDrag(event, ticket)}
                       onPointerMove={trackDrag}
                       onPointerUp={endDrag}
