@@ -9,9 +9,33 @@ const instructions = [
   'Si next es abrir pull, reserva con claim. La rama nace de fromBranch y el pull apunta a pullBranch: abre la rama con la clave del ticket desde fromBranch y crea el pull hacia pullBranch. Regístralo con attach_pr. Al final revisa ese cambio con thermos y corrige lo que pida. No lo mezcles.',
   'Si next es solo sugerir, deja la sugerencia y no abras el pull.',
   'Cuando termines, claim si no lo reservaste y move el ticket al estado que te pidan. Si dicen asignación de prioridad, el estado es asignación de prioridad. Después release.',
+  'Para registrar un ticket usa create_ticket. El título es obligatorio. Lo demás es opcional y usa los mismos nombres de la ficha: kind ticket o request, priority, estimate, autonomy, assignee por alias, status, sprint y version por nombre, categories y repos por nombre.',
 ].join(' ')
 
 const tools = [
+  {
+    name: 'create_ticket',
+    description: 'Registra un ticket con la ficha del dev. title es obligatorio. kind es ticket o request. priority va de 1 urgente a 4 baja. estimate es xs, s, m o l. autonomy es suggest, pull o human. assignee es el alias. status, sprint, version, categories y repos son nombres. Si omites uno, queda el valor de un ticket nuevo.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        body: { type: 'string' },
+        kind: { type: 'string', enum: ['ticket', 'request'] },
+        priority: { type: 'integer', minimum: 1, maximum: 4 },
+        estimate: { type: 'string', enum: ['xs', 's', 'm', 'l'] },
+        autonomy: { type: 'string', enum: ['suggest', 'pull', 'human'] },
+        assignee: { type: 'string' },
+        status: { type: 'string' },
+        sprint: { type: 'string' },
+        version: { type: 'string' },
+        categories: { type: 'array', items: { type: 'string' } },
+        repos: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['title'],
+      additionalProperties: false,
+    },
+  },
   {
     name: 'inbox',
     description: 'Lee los tickets de un estado y el catálogo de repos de la empresa. status es el nombre o un pedazo, por ejemplo revisión o asignación de prioridad. Si lo omites, lee el primero del flujo. catalog son los que se pueden marcar. Cada repo trae fromBranch, de donde nace la rama, y pullBranch, a donde apunta el pull. tickets trae el reporte, si es Ticket o Requerimiento, los repos ya marcados y los nombres de archivos.',
@@ -187,6 +211,23 @@ async function callRpc(name, args) {
 }
 
 function argumentsFor(name, token, args) {
+  if (name === 'create_ticket') {
+    return ['agent_create_ticket', {
+      p_token: token,
+      p_title: args.title,
+      p_body: args.body ?? null,
+      p_kind: args.kind ?? null,
+      p_priority: args.priority ?? null,
+      p_estimate: args.estimate ?? null,
+      p_autonomy: args.autonomy ?? null,
+      p_assignee: args.assignee ?? null,
+      p_status: args.status ?? null,
+      p_sprint: args.sprint ?? null,
+      p_version: args.version ?? null,
+      p_categories: args.categories ?? null,
+      p_repos: args.repos ?? null,
+    }]
+  }
   if (name === 'inbox') return ['agent_inbox', { p_token: token, p_status: args.status ?? null }]
   if (name === 'search') return ['agent_search', { p_token: token, p_query: args.query ?? null }]
   if (name === 'move') {

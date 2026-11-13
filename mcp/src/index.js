@@ -25,6 +25,7 @@ const server = new McpServer({
     'Si next es abrir pull, reserva con claim. La rama nace de fromBranch y el pull apunta a pullBranch: abre la rama con la clave desde fromBranch y crea el pull hacia pullBranch. Regístralo con attach_pr y al final pasa thermos. No lo mezcles.',
     'Si next es solo sugerir, no abras el pull.',
     'Cuando termines, claim si no lo reservaste y move el ticket al estado que te pidan. Si dicen asignación de prioridad, el estado es asignación de prioridad. Después release.',
+    'Para registrar un ticket usa create_ticket. El título es obligatorio. Lo demás es opcional y usa los mismos nombres de la ficha: kind ticket o request, priority, estimate, autonomy, assignee por alias, status, sprint y version por nombre, categories y repos por nombre.',
   ].join(' '),
 })
 
@@ -45,6 +46,39 @@ async function call(fn, args) {
   if (error) return { content: [{ type: 'text', text: error.message }], isError: true }
   return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] }
 }
+
+server.tool(
+  'create_ticket',
+  'Registra un ticket con la ficha del dev. title es obligatorio. kind es ticket o request. priority va de 1 urgente a 4 baja. estimate es xs, s, m o l. autonomy es suggest, pull o human. assignee es el alias. status, sprint, version, categories y repos son nombres. Si omites uno, queda el valor de un ticket nuevo.',
+  {
+    title: z.string(),
+    body: z.string().optional(),
+    kind: z.enum(['ticket', 'request']).optional(),
+    priority: z.number().int().min(1).max(4).optional(),
+    estimate: z.enum(['xs', 's', 'm', 'l']).optional(),
+    autonomy: z.enum(['suggest', 'pull', 'human']).optional(),
+    assignee: z.string().optional(),
+    status: z.string().optional(),
+    sprint: z.string().optional(),
+    version: z.string().optional(),
+    categories: z.array(z.string()).optional(),
+    repos: z.array(z.string()).optional(),
+  },
+  async (args) => call('agent_create_ticket', {
+    p_title: args.title,
+    p_body: args.body ?? null,
+    p_kind: args.kind ?? null,
+    p_priority: args.priority ?? null,
+    p_estimate: args.estimate ?? null,
+    p_autonomy: args.autonomy ?? null,
+    p_assignee: args.assignee ?? null,
+    p_status: args.status ?? null,
+    p_sprint: args.sprint ?? null,
+    p_version: args.version ?? null,
+    p_categories: args.categories ?? null,
+    p_repos: args.repos ?? null,
+  }),
+)
 
 server.tool(
   'inbox',

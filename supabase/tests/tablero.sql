@@ -1,6 +1,6 @@
 begin;
 
-select plan(50);
+select plan(55);
 
 insert into public.companies (name, slug)
 values ('Acme', 'acme')
@@ -493,6 +493,84 @@ select is(
 select is(private.file_mime('foto.PNG'), 'image/png', 'una imagen png');
 select is(private.file_mime('virus.exe'), null::text, 'un exe no es un archivo del ticket');
 select is(private.file_mime('pagina.HTML'), 'text/html', 'un html del ticket');
+
+insert into public.categories (company_id, name)
+values (:'company_id'::uuid, 'Móvil');
+
+insert into public.sprints (company_id, name, starts_on, ends_on)
+values (:'company_id'::uuid, 'Quincena', current_date, current_date + 13);
+
+insert into public.versions (company_id, name)
+values (:'company_id'::uuid, '1.4');
+
+select is(
+  (
+    public.agent_create_ticket(
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'Ver el cupo',
+      'El cupo no cuadra',
+      'request',
+      2,
+      's',
+      'human',
+      'Ana',
+      'En cola',
+      'Quincena',
+      '1.4',
+      array['Móvil'],
+      array['Finloopmx/Frontend']
+    ) ->> 'status'
+  ),
+  'En cola',
+  'el agente crea el ticket con su ficha'
+);
+
+select is(
+  (
+    select assignee_id::text
+    from public.tickets
+    where company_id = :'company_id'::uuid
+      and title = 'Ver el cupo'
+  ),
+  '22222222-2222-4222-8222-222222222222',
+  'el alta deja el asignado'
+);
+
+select throws_ok(
+  $$select public.agent_create_ticket('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'Sin repo', '', 'ticket', 3, 'm', 'suggest', null, null, null, null, '{}', array['otra/cosa'])$$,
+  'P0001',
+  'repo no encontrado'
+);
+
+select is(
+  (
+    select count(*)::int
+    from public.ticket_events e
+    join public.tickets t on t.id = e.ticket_id
+    where t.company_id = :'company_id'::uuid
+      and t.title = 'Ver el cupo'
+      and e.visibility = 'public'
+      and e.body like '%·%'
+  ),
+  0,
+  'el alta no anota un cambio de estado'
+);
+
+insert into public.version_categories (company_id, name)
+values
+  (:'company_id'::uuid, 'Móvil'),
+  (:'company_id'::uuid, 'Dash');
+
+insert into public.versions (company_id, name, category_id)
+values
+  (:'company_id'::uuid, '2.0', (select id from public.version_categories where company_id = :'company_id' and name = 'Móvil')),
+  (:'company_id'::uuid, '2.0', (select id from public.version_categories where company_id = :'company_id' and name = 'Dash'));
+
+select throws_ok(
+  $$select public.agent_create_ticket('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'Versión repetida', '', 'ticket', 3, 'm', 'suggest', null, null, null, '2.0', '{}', '{}')$$,
+  'P0001',
+  'hay más de una versión con ese nombre'
+);
 
 select * from finish();
 
