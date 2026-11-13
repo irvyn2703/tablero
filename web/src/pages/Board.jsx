@@ -6,9 +6,32 @@ import { discardTicket } from '../lib/files'
 import { ActionButton, Alert, Done, Progress, TicketChips, useFeedback } from '../components/ui'
 
 const PAGE = 12
+const UNCATEGORIZED = 'none'
+
+function catStorageKey(userId, companyId) {
+  return `tablero-cats:${userId}:${companyId}`
+}
+
+function readPickedCats(userId, companyId) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(catStorageKey(userId, companyId)) || '[]')
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((id) => id === UNCATEGORIZED || (typeof id === 'string' && id.length > 0))
+  } catch {
+    return []
+  }
+}
+
+function storePickedCats(userId, companyId, next) {
+  try {
+    localStorage.setItem(catStorageKey(userId, companyId), JSON.stringify(next))
+  } catch {
+    // The choice still holds for this visit.
+  }
+}
 
 export function Board() {
-  const { company, role } = useOutletContext()
+  const { company, role, session } = useOutletContext()
   const editable = canEdit(role)
   const { companyId } = useParams()
   const [statuses, setStatuses] = useState([])
@@ -22,11 +45,13 @@ export function Board() {
   const [categories, setCategories] = useState([])
   const [links, setLinks] = useState([])
   const [members, setMembers] = useState([])
-  const [pickedCats, setPickedCats] = useState([])
+  const userId = session.user.id
+  const [pickedCats, setPickedCats] = useState(() => readPickedCats(userId, companyId))
   const [categoryName, setCategoryName] = useState('')
   const dragRef = useRef(null)
   const boardRef = useRef(null)
   const spots = useRef(new Map())
+  const loadGen = useRef(0)
   const { busy, done, mark, run } = useFeedback()
 
   useLayoutEffect(() => {
@@ -68,6 +93,9 @@ export function Board() {
   })
 
   async function load() {
+    const gen = ++loadGen.current
+    const forUser = userId
+    const forCompany = companyId
     const [statusRes, ticketRes, versionRes, versionCategoryRes, categoryRes, linkRes, memberRes] = await Promise.all([
       supabase.from('statuses').select('id, name, kind, position, weight, color, allows_delete').eq('company_id', companyId).order('position'),
       supabase.from('ticket_rows').select('id, public_number, title, status_id, progress, local_percent, priority, estimate, rank, version_id, assignee_id').eq('company_id', companyId).order('rank'),
@@ -77,6 +105,7 @@ export function Board() {
       supabase.from('ticket_categories').select('ticket_id, category_id').eq('company_id', companyId),
       supabase.from('company_members').select('user_id, alias').eq('company_id', companyId),
     ])
+    if (gen !== loadGen.current) return
     const failed = [statusRes, ticketRes, versionRes, versionCategoryRes, categoryRes, linkRes, memberRes].find((item) => item.error)
     if (failed) {
       setError(messageFrom(failed.error))
@@ -89,12 +118,27 @@ export function Board() {
     setCategories(categoryRes.data ?? [])
     setLinks(linkRes.data ?? [])
     setMembers(memberRes.data ?? [])
+    const known = new Set((categoryRes.data ?? []).map((item) => item.id))
+    setPickedCats((current) => {
+      const next = current.filter((id) => id === UNCATEGORIZED || known.has(id))
+      if (next.length !== current.length) storePickedCats(forUser, forCompany, next)
+      return next
+    })
   }
 
   useEffect(() => {
     setShown({})
+    setPickedCats(readPickedCats(userId, companyId))
     load()
-  }, [companyId])
+  }, [companyId, userId])
+
+  function applyPicked(updater) {
+    setPickedCats((current) => {
+      const next = updater(current)
+      storePickedCats(userId, companyId, next)
+      return next
+    })
+  }
 
   function reveal(statusId, total) {
     setShown((current) => {
@@ -256,11 +300,12 @@ export function Board() {
   function matches(ticket) {
     if (pickedCats.length === 0) return true
     const ids = links.filter((link) => link.ticket_id === ticket.id).map((link) => link.category_id)
+    if (ids.length === 0) return pickedCats.includes(UNCATEGORIZED)
     return pickedCats.some((id) => ids.includes(id))
   }
 
   function toggleCat(id) {
-    setPickedCats((current) => (
+    applyPicked((current) => (
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
     ))
   }
@@ -296,7 +341,7 @@ export function Board() {
         setError(messageFrom(deleteError))
         return false
       }
-      setPickedCats((current) => current.filter((item) => item !== category.id))
+      applyPicked((current) => current.filter((item) => item !== category.id))
       await load()
     }, 'Categoría quitada.')
   }
@@ -340,6 +385,14 @@ export function Board() {
       <Done name={mark} mark={mark}>{done}</Done>
       <div className="cat-bar">
         <div className="cat-list" role="group" aria-label="Filtrar por categoría">
+          <button
+            className={pickedCats.includes(UNCATEGORIZED) ? 'cat on' : 'cat'}
+            type="button"
+            aria-pressed={pickedCats.includes(UNCATEGORIZED)}
+            onClick={() => toggleCat(UNCATEGORIZED)}
+          >
+            Sin categoría
+          </button>
           {categories.map((category) => (
             <span className="cat-item" key={category.id}>
               <button
