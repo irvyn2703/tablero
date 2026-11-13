@@ -5,6 +5,7 @@ import { autonomyLabel, canEdit, estimateLabel, kindName, memberName, messageFro
 import { takeFiles, uploadTicketFiles } from '../lib/files'
 import { useLogoUrl } from '../lib/logo'
 import { FilePicker } from '../components/Files'
+import { RepoChecks } from '../components/RepoChecks'
 import { ActionButton, Alert, Done, KindChoice, Secret, useFeedback } from '../components/ui'
 
 export function NewTicket() {
@@ -20,13 +21,15 @@ export function NewTicket() {
   const [assigneeId, setAssigneeId] = useState('')
   const [statusId, setStatusId] = useState('')
   const [chosenCategories, setChosenCategories] = useState([])
+  const [chosenRepos, setChosenRepos] = useState([])
   const [statuses, setStatuses] = useState([])
   const [members, setMembers] = useState([])
   const [categories, setCategories] = useState([])
+  const [repos, setRepos] = useState([])
   const [files, setFiles] = useState([])
   const [madeId, setMadeId] = useState('')
   const [detailsSaved, setDetailsSaved] = useState(false)
-  const detailSteps = useRef({ id: '', fields: false, status: false, categories: false })
+  const detailStep = useRef({ id: '', next: 0 })
   const [secret, setSecret] = useState('')
   const [error, setError] = useState('')
   const { busy, done, mark, run } = useFeedback()
@@ -37,9 +40,10 @@ export function NewTicket() {
       supabase.from('statuses').select('id, name, kind, position').eq('company_id', companyId).order('position'),
       supabase.from('company_members').select('user_id, alias').eq('company_id', companyId),
       supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
-    ]).then(([statusRes, memberRes, categoryRes]) => {
+      supabase.from('repos').select('id, github_full_name, source_branch, default_branch').eq('company_id', companyId).order('github_full_name'),
+    ]).then(([statusRes, memberRes, categoryRes, repoRes]) => {
       if (!alive) return
-      const failed = [statusRes, memberRes, categoryRes].find((item) => item.error)
+      const failed = [statusRes, memberRes, categoryRes, repoRes].find((item) => item.error)
       if (failed) {
         setError(messageFrom(failed.error))
         return
@@ -49,6 +53,7 @@ export function NewTicket() {
       setStatusId((current) => current || rows.find((item) => item.kind === 'work')?.id || rows[0]?.id || '')
       setMembers(memberRes.data ?? [])
       setCategories(categoryRes.data ?? [])
+      setRepos(repoRes.data ?? [])
     })
     return () => { alive = false }
   }, [companyId])
@@ -63,12 +68,20 @@ export function NewTicket() {
     return [`Tipo\n${kindName(kind)}`, body.trim()].filter(Boolean).join('\n\n')
   }
 
+  async function replaceLinks(id, table, column, ids) {
+    const { error: clearError } = await supabase.from(table).delete().eq('ticket_id', id).eq('company_id', companyId)
+    if (clearError) return clearError
+    if (ids.length === 0) return null
+    const { error } = await supabase.from(table).insert(
+      ids.map((value) => ({ company_id: companyId, ticket_id: id, [column]: value })),
+    )
+    return error
+  }
+
   async function saveDetails(id) {
-    const step = detailSteps.current.id === id
-      ? detailSteps.current
-      : { id, fields: false, status: false, categories: false }
-    detailSteps.current = step
-    if (!step.fields) {
+    const step = detailStep.current.id === id ? detailStep.current : { id, next: 0 }
+    detailStep.current = step
+    if (step.next < 1) {
       const { error: updateError } = await supabase.from('tickets').update({
         title,
         body: ticketBody(),
@@ -78,10 +91,10 @@ export function NewTicket() {
         assignee_id: assigneeId || null,
       }).eq('id', id)
       if (updateError) return updateError
-      step.fields = true
+      step.next = 1
     }
-    const openedIn = statuses.find((item) => item.kind === 'work')?.id || statuses[0]?.id || ''
-    if (!step.status) {
+    if (step.next < 2) {
+      const openedIn = statuses.find((item) => item.kind === 'work')?.id || statuses[0]?.id || ''
       if (statusId && statusId !== openedIn) {
         const { error: statusError } = await supabase.rpc('set_ticket_progress', {
           p_ticket_id: id,
@@ -90,18 +103,18 @@ export function NewTicket() {
         })
         if (statusError) return statusError
       }
-      step.status = true
+      step.next = 2
     }
-    if (step.categories) return null
-    const { error: clearError } = await supabase.from('ticket_categories').delete().eq('ticket_id', id).eq('company_id', companyId)
-    if (clearError) return clearError
-    if (chosenCategories.length > 0) {
-      const { error: categoryError } = await supabase.from('ticket_categories').insert(
-        chosenCategories.map((categoryId) => ({ company_id: companyId, ticket_id: id, category_id: categoryId })),
-      )
+    if (step.next < 3) {
+      const categoryError = await replaceLinks(id, 'ticket_categories', 'category_id', chosenCategories)
       if (categoryError) return categoryError
+      step.next = 3
     }
-    step.categories = true
+    if (step.next < 4) {
+      const repoError = await replaceLinks(id, 'ticket_repos', 'repo_id', chosenRepos)
+      if (repoError) return repoError
+      step.next = 4
+    }
     return null
   }
 
@@ -123,9 +136,10 @@ export function NewTicket() {
     setAssigneeId('')
     setStatusId(first)
     setChosenCategories([])
+    setChosenRepos([])
     setMadeId('')
     setDetailsSaved(false)
-    detailSteps.current = { id: '', fields: false, status: false, categories: false }
+    detailStep.current = { id: '', next: 0 }
     setFiles([])
   }
 
@@ -225,6 +239,14 @@ export function NewTicket() {
             </select>
           </label>
         </div>
+        <RepoChecks
+          repos={repos}
+          chosen={chosenRepos}
+          disabled={Boolean(busy)}
+          onChange={(repoId, checked) => setChosenRepos((current) => (
+            checked ? [...current, repoId] : current.filter((item) => item !== repoId)
+          ))}
+        />
         {categories.length > 0 && (
           <div className="field" style={{ marginTop: '0.8rem' }}>
             <span>Categorías</span>

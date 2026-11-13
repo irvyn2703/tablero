@@ -5,6 +5,7 @@ import { autonomyLabel, canEdit, estimateLabel, formatWhen, localDateKey, member
 import { discardTicket, openTicketFile, takeFiles, uploadTicketFiles } from '../lib/files'
 import { useLogoUrl } from '../lib/logo'
 import { FilePicker, SavedFiles } from '../components/Files'
+import { RepoChecks } from '../components/RepoChecks'
 import { Thread } from '../components/Thread'
 import { ActionButton, Alert, Done, Progress, Secret, TicketChips, useFeedback, writeClipboard } from '../components/ui'
 
@@ -338,27 +339,14 @@ export function Ticket() {
             </select>
           </label>
         </div>
-        <div className="field" style={{ marginTop: '0.8rem' }}>
-          <span>Repos</span>
-          {repos.length === 0
-            ? <p className="quiet">Agrega repos en la sección Repos.</p>
-            : repos.map((repo) => (
-              <label className="check-row" key={repo.id}>
-                <input
-                  type="checkbox"
-                  checked={chosenRepos.includes(repo.id)}
-                  disabled={!editable}
-                  onChange={(event) => setChosenRepos((current) => (
-                    event.target.checked
-                      ? [...current, repo.id]
-                      : current.filter((id) => id !== repo.id)
-                  ))}
-                />
-                <span>{repo.github_full_name}</span>
-                <span className="quiet">{repo.source_branch} → {repo.default_branch}</span>
-              </label>
-            ))}
-        </div>
+        <RepoChecks
+          repos={repos}
+          chosen={chosenRepos}
+          disabled={!editable}
+          onChange={(repoId, checked) => setChosenRepos((current) => (
+            checked ? [...current, repoId] : current.filter((id) => id !== repoId)
+          ))}
+        />
         <div className="field" style={{ marginTop: '0.8rem' }}>
           <span>Categorías</span>
           {categories.length === 0
