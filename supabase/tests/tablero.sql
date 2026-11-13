@@ -1,6 +1,6 @@
 begin;
 
-select plan(55);
+select plan(61);
 
 insert into public.companies (name, slug)
 values ('Acme', 'acme')
@@ -570,6 +570,65 @@ select throws_ok(
   $$select public.agent_create_ticket('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'Versión repetida', '', 'ticket', 3, 'm', 'suggest', null, null, null, '2.0', '{}', '{}')$$,
   'P0001',
   'hay más de una versión con ese nombre'
+);
+
+select lives_ok(
+  format(
+    $sql$insert into public.repos (company_id, github_full_name, source_branch, default_branch)
+    values (%L::uuid, 'Finloopmx/Frontend', 'release', 'develop')$sql$,
+    :'company_id'
+  ),
+  'el mismo nombre cabe si nace de otra rama'
+);
+
+select lives_ok(
+  format(
+    $sql$insert into public.repos (company_id, github_full_name, source_branch, default_branch)
+    values (%L::uuid, 'Finloopmx/Frontend', 'main', 'staging')$sql$,
+    :'company_id'
+  ),
+  'el mismo nombre cabe si el pull apunta a otra rama'
+);
+
+select throws_ok(
+  format(
+    $sql$insert into public.repos (company_id, github_full_name, source_branch, default_branch)
+    values (%L::uuid, 'Finloopmx/Frontend', 'main', 'develop')$sql$,
+    :'company_id'
+  ),
+  '23505',
+  'duplicate key value violates unique constraint "repos_company_route_key"',
+  'el mismo nombre con las mismas ramas no se repite'
+);
+
+select throws_ok(
+  format(
+    $sql$select public.agent_assign_repos('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', %L::uuid, array['Finloopmx/Frontend'])$sql$,
+    :'later_id'
+  ),
+  'P0001',
+  'hay más de un repo con ese nombre'
+);
+
+select throws_ok(
+  format(
+    $sql$select public.agent_assign_repos('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', %L::uuid, array['Finloopmx/Frontend|release'])$sql$,
+    :'later_id'
+  ),
+  'P0001',
+  'indica las dos ramas'
+);
+
+select is(
+  jsonb_array_length(
+    public.agent_assign_repos(
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      :'later_id'::uuid,
+      array['Finloopmx/Frontend|release|develop']
+    ) -> 'repos'
+  ),
+  1,
+  'el agente elige la ruta cuando el nombre se repite'
 );
 
 select * from finish();

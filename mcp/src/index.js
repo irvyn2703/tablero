@@ -21,7 +21,7 @@ const server = new McpServer({
     'Cuando te pidan revisar tickets, lee con inbox el estado que nombren. Si no nombran uno, inbox trae el primero del flujo.',
     'Antes de decidir, search con palabras del título para ver si ya existe. Si otro ticket abierto describe lo mismo, dilo en la nota y deja autonomy en human.',
     'Comprueba en el repo si el error existe, o si el requerimiento ya está resuelto.',
-    'Marca los repos con assign_repos y la complejidad con suggest.',
+    'Marca los repos con assign_repos y la complejidad con suggest. Si el nombre se repite, indícalo como org/repo|fromBranch|pullBranch.',
     'Si next es abrir pull, reserva con claim. La rama nace de fromBranch y el pull apunta a pullBranch: abre la rama con la clave desde fromBranch y crea el pull hacia pullBranch. Regístralo con attach_pr y al final pasa thermos. No lo mezcles.',
     'Si next es solo sugerir, no abras el pull.',
     'Cuando termines, claim si no lo reservaste y move el ticket al estado que te pidan. Si dicen asignación de prioridad, el estado es asignación de prioridad. Después release.',
@@ -49,7 +49,7 @@ async function call(fn, args) {
 
 server.tool(
   'create_ticket',
-  'Registra un ticket con la ficha del dev. title es obligatorio. kind es ticket o request. priority va de 1 urgente a 4 baja. estimate es xs, s, m o l. autonomy es suggest, pull o human. assignee es el alias. status, sprint, version, categories y repos son nombres. Si omites uno, queda el valor de un ticket nuevo.',
+  'Registra un ticket con la ficha del dev. title es obligatorio. kind es ticket o request. priority va de 1 urgente a 4 baja. estimate es xs, s, m o l. autonomy es suggest, pull o human. assignee es el alias. status, sprint, version, categories y repos son nombres. Si un repo se repite, indícalo como org/repo|fromBranch|pullBranch. Si omites uno, queda el valor de un ticket nuevo.',
   {
     title: z.string(),
     body: z.string().optional(),
@@ -96,7 +96,7 @@ server.tool(
 
 server.tool(
   'assign_repos',
-  'Marca los repos de un ticket que sigue en trabajo. repos son nombres de catalog, por ejemplo Finloopmx/Frontend. Una lista vacía los quita. Sustituye los que ya tenía.',
+  'Marca los repos de un ticket que sigue en trabajo. repos son nombres de catalog, por ejemplo Finloopmx/Frontend. Si el nombre se repite, indícalo como org/repo|fromBranch|pullBranch. Una lista vacía los quita. Sustituye los que ya tenía.',
   {
     ticket_id: z.string().uuid(),
     repos: z.array(z.string()),

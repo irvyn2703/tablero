@@ -4,7 +4,7 @@ const instructions = [
   'Cuando te pidan revisar tickets, lee con inbox el estado que nombren. Si no nombran uno, inbox trae el primero del flujo. catalog son los repos de la empresa. Cada repo trae fromBranch, de donde nace la rama, y pullBranch, a donde apunta el pull. Cada ticket trae type Ticket o Requerimiento, el reporte en body y los repos ya marcados.',
   'Antes de decidir, search con palabras del título para ver si ya existe. Si otro ticket abierto describe lo mismo, dilo en la nota y deja autonomy en human.',
   'Comprueba en el repo si el error existe, o si el requerimiento ya está resuelto.',
-  'Marca los repos que correspondan con assign_repos, usando los nombres de catalog.',
+  'Marca los repos que correspondan con assign_repos, usando los nombres de catalog. Si el nombre se repite, indícalo como org/repo|fromBranch|pullBranch.',
   'Guarda la complejidad con suggest: priority 1 urgente a 4 baja, estimate xs, s, m o l, y autonomy suggest, pull o human.',
   'Si next es abrir pull, reserva con claim. La rama nace de fromBranch y el pull apunta a pullBranch: abre la rama con la clave del ticket desde fromBranch y crea el pull hacia pullBranch. Regístralo con attach_pr. Al final revisa ese cambio con thermos y corrige lo que pida. No lo mezcles.',
   'Si next es solo sugerir, deja la sugerencia y no abras el pull.',
@@ -15,7 +15,7 @@ const instructions = [
 const tools = [
   {
     name: 'create_ticket',
-    description: 'Registra un ticket con la ficha del dev. title es obligatorio. kind es ticket o request. priority va de 1 urgente a 4 baja. estimate es xs, s, m o l. autonomy es suggest, pull o human. assignee es el alias. status, sprint, version, categories y repos son nombres. Si omites uno, queda el valor de un ticket nuevo.',
+    description: 'Registra un ticket con la ficha del dev. title es obligatorio. kind es ticket o request. priority va de 1 urgente a 4 baja. estimate es xs, s, m o l. autonomy es suggest, pull o human. assignee es el alias. status, sprint, version, categories y repos son nombres. Si un repo se repite, indícalo como org/repo|fromBranch|pullBranch. Si omites uno, queda el valor de un ticket nuevo.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -57,7 +57,7 @@ const tools = [
   },
   {
     name: 'assign_repos',
-    description: 'Marca los repos de un ticket que sigue en trabajo. repos son nombres de catalog, por ejemplo Finloopmx/Frontend. Una lista vacía los quita. Sustituye los que ya tenía.',
+    description: 'Marca los repos de un ticket que sigue en trabajo. repos son nombres de catalog, por ejemplo Finloopmx/Frontend. Si el nombre se repite, indícalo como org/repo|fromBranch|pullBranch. Una lista vacía los quita. Sustituye los que ya tenía.',
     inputSchema: {
       type: 'object',
       properties: {

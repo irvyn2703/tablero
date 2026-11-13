@@ -15,7 +15,13 @@ export function Repos() {
   const { busy, done, mark, run } = useFeedback()
 
   async function load() {
-    const { data, error: loadError } = await supabase.from('repos').select('id, github_full_name, source_branch, default_branch').eq('company_id', companyId)
+    const { data, error: loadError } = await supabase
+      .from('repos')
+      .select('id, github_full_name, source_branch, default_branch')
+      .eq('company_id', companyId)
+      .order('github_full_name')
+      .order('source_branch')
+      .order('default_branch')
     if (loadError) setError(messageFrom(loadError))
     else setRepos(data ?? [])
   }
@@ -26,14 +32,21 @@ export function Repos() {
     event.preventDefault()
     await run('add', async () => {
       setError('')
+      const github = name.trim()
+      const born = source.trim()
+      const lands = branch.trim()
+      if (!github || !born || !lands) {
+        setError('Indica el repo y las dos ramas.')
+        return false
+      }
       const { error: insertError } = await supabase.from('repos').insert({
         company_id: companyId,
-        github_full_name: name,
-        source_branch: source,
-        default_branch: branch,
+        github_full_name: github,
+        source_branch: born,
+        default_branch: lands,
       })
       if (insertError) {
-        setError(messageFrom(insertError))
+        setError(insertError.code === '23505' ? 'Ya existe ese repo con las mismas ramas.' : messageFrom(insertError))
         return false
       }
       setName('')
