@@ -1,31 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { absolutePath, supabase } from '../lib/supabase'
-import { autonomyLabel, canEdit, estimateLabel, formatWhen, localDateKey, memberName, messageFrom, priorityLabel, sprintSpan, ticketKey } from '../lib/format'
+import { autonomyLabel, canEdit, estimateLabel, formatWhen, memberName, messageFrom, priorityLabel, ticketKey } from '../lib/format'
 import { discardTicket, openTicketFile, takeFiles, uploadTicketFiles } from '../lib/files'
 import { useLogoUrl } from '../lib/logo'
 import { FilePicker, SavedFiles } from '../components/Files'
 import { RepoChecks } from '../components/RepoChecks'
+import { SprintField, VersionField } from '../components/PlanFields'
 import { Thread } from '../components/Thread'
 import { ActionButton, Alert, Done, Progress, Secret, TicketChips, useFeedback, writeClipboard } from '../components/ui'
-
-function sprintChoices(sprints, selectedId, today) {
-  const current = []
-  const upcoming = []
-  const previous = []
-  for (const sprint of sprints) {
-    const start = String(sprint.starts_on || '')
-    const end = String(sprint.ends_on || '')
-    if (start && end && start <= today && end >= today) current.push(sprint)
-    else if (start && start > today) upcoming.push(sprint)
-    else if (sprint.id === selectedId) previous.push(sprint)
-  }
-  return [
-    current.length ? { label: 'En curso', sprints: current } : null,
-    upcoming.length ? { label: 'Próximos', sprints: upcoming } : null,
-    previous.length ? { label: 'Anterior', sprints: previous } : null,
-  ].filter(Boolean)
-}
 
 export function Ticket() {
   const navigate = useNavigate()
@@ -296,48 +279,20 @@ export function Ticket() {
               {members.map((member) => <option key={member.user_id} value={member.user_id}>{memberName(member)}</option>)}
             </select>
           </label>
-          <label className="field">
-            <span>Sprint</span>
-            <select value={ticket.sprint_id || ''} onChange={(event) => patch({ sprint_id: event.target.value })} disabled={!editable}>
-              <option value="">Backlog</option>
-              {sprintChoices(sprints, savedSprintId, localDateKey()).map((group) => (
-                <optgroup key={group.label} label={group.label}>
-                  {group.sprints.map((sprint) => {
-                    const span = sprintSpan(sprint)
-                    return (
-                      <option key={sprint.id} value={sprint.id}>
-                        {span ? `${sprint.name} · ${span}` : sprint.name}
-                      </option>
-                    )
-                  })}
-                </optgroup>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Versión</span>
-            <select value={ticket.version_id || ''} onChange={(event) => patch({ version_id: event.target.value })} disabled={!editable}>
-              <option value="">Sin versión</option>
-              {[
-                ...versionCategories.map((category) => ({
-                  key: category.id,
-                  label: category.name,
-                  items: versions.filter((version) => version.category_id === category.id),
-                })),
-                {
-                  key: 'none',
-                  label: 'Sin categoría',
-                  items: versions.filter((version) => !version.category_id),
-                },
-              ].filter((group) => group.items.length).map((group) => (
-                <optgroup key={group.key} label={group.label}>
-                  {group.items.map((version) => (
-                    <option key={version.id} value={version.id}>{version.name}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </label>
+          <SprintField
+            sprints={sprints}
+            value={ticket.sprint_id}
+            keepId={savedSprintId}
+            disabled={!editable}
+            onChange={(sprintId) => patch({ sprint_id: sprintId })}
+          />
+          <VersionField
+            versions={versions}
+            categories={versionCategories}
+            value={ticket.version_id}
+            disabled={!editable}
+            onChange={(versionId) => patch({ version_id: versionId })}
+          />
         </div>
         <RepoChecks
           repos={repos}

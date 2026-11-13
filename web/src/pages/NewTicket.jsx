@@ -6,6 +6,7 @@ import { takeFiles, uploadTicketFiles } from '../lib/files'
 import { useLogoUrl } from '../lib/logo'
 import { FilePicker } from '../components/Files'
 import { RepoChecks } from '../components/RepoChecks'
+import { SprintField, VersionField } from '../components/PlanFields'
 import { ActionButton, Alert, Done, KindChoice, Secret, useFeedback } from '../components/ui'
 
 export function NewTicket() {
@@ -20,12 +21,17 @@ export function NewTicket() {
   const [autonomy, setAutonomy] = useState('suggest')
   const [assigneeId, setAssigneeId] = useState('')
   const [statusId, setStatusId] = useState('')
+  const [sprintId, setSprintId] = useState('')
+  const [versionId, setVersionId] = useState('')
   const [chosenCategories, setChosenCategories] = useState([])
   const [chosenRepos, setChosenRepos] = useState([])
   const [statuses, setStatuses] = useState([])
   const [members, setMembers] = useState([])
   const [categories, setCategories] = useState([])
   const [repos, setRepos] = useState([])
+  const [sprints, setSprints] = useState([])
+  const [versions, setVersions] = useState([])
+  const [versionCategories, setVersionCategories] = useState([])
   const [files, setFiles] = useState([])
   const [madeId, setMadeId] = useState('')
   const [detailsSaved, setDetailsSaved] = useState(false)
@@ -41,9 +47,12 @@ export function NewTicket() {
       supabase.from('company_members').select('user_id, alias').eq('company_id', companyId),
       supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
       supabase.from('repos').select('id, github_full_name, source_branch, default_branch').eq('company_id', companyId).order('github_full_name'),
-    ]).then(([statusRes, memberRes, categoryRes, repoRes]) => {
+      supabase.from('sprints').select('id, name, starts_on, ends_on').eq('company_id', companyId).order('starts_on'),
+      supabase.from('versions').select('id, name, category_id').eq('company_id', companyId).order('created_at', { ascending: false }),
+      supabase.from('version_categories').select('id, name').eq('company_id', companyId).order('name'),
+    ]).then(([statusRes, memberRes, categoryRes, repoRes, sprintRes, versionRes, versionCategoryRes]) => {
       if (!alive) return
-      const failed = [statusRes, memberRes, categoryRes, repoRes].find((item) => item.error)
+      const failed = [statusRes, memberRes, categoryRes, repoRes, sprintRes, versionRes, versionCategoryRes].find((item) => item.error)
       if (failed) {
         setError(messageFrom(failed.error))
         return
@@ -54,6 +63,9 @@ export function NewTicket() {
       setMembers(memberRes.data ?? [])
       setCategories(categoryRes.data ?? [])
       setRepos(repoRes.data ?? [])
+      setSprints(sprintRes.data ?? [])
+      setVersions(versionRes.data ?? [])
+      setVersionCategories(versionCategoryRes.data ?? [])
     })
     return () => { alive = false }
   }, [companyId])
@@ -89,6 +101,8 @@ export function NewTicket() {
         estimate,
         autonomy,
         assignee_id: assigneeId || null,
+        sprint_id: sprintId || null,
+        version_id: versionId || null,
       }).eq('id', id)
       if (updateError) return updateError
       step.next = 1
@@ -135,6 +149,8 @@ export function NewTicket() {
     setAutonomy('suggest')
     setAssigneeId('')
     setStatusId(first)
+    setSprintId('')
+    setVersionId('')
     setChosenCategories([])
     setChosenRepos([])
     setMadeId('')
@@ -238,6 +254,19 @@ export function NewTicket() {
               {statuses.map((status) => <option key={status.id} value={status.id}>{status.name}</option>)}
             </select>
           </label>
+          <SprintField
+            sprints={sprints}
+            value={sprintId}
+            disabled={Boolean(busy)}
+            onChange={setSprintId}
+          />
+          <VersionField
+            versions={versions}
+            categories={versionCategories}
+            value={versionId}
+            disabled={Boolean(busy)}
+            onChange={setVersionId}
+          />
         </div>
         <RepoChecks
           repos={repos}
