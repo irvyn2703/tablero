@@ -8,19 +8,25 @@ export function parseStatusChange(body) {
 
 export function marksByDay(tickets, events, dayKey) {
   const ticketsById = new Map(tickets.map((ticket) => [ticket.id, ticket]))
+  const prior = new Map()
   const latest = new Map()
-  events.forEach((event) => {
+  const ordered = [...events].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+  ordered.forEach((event) => {
     const parsed = parseStatusChange(event.body)
     if (!parsed) return
     const ticket = ticketsById.get(event.ticket_id)
     if (!ticket) return
     const day = dayKey(new Date(event.created_at))
-    latest.set(`${ticket.id}|${day}`, {
+    const key = `${ticket.id}|${day}`
+    const kept = latest.get(key)
+    latest.set(key, {
       ...ticket,
       day,
       statusName: parsed.status,
+      from: kept ? kept.from : (prior.has(ticket.id) ? prior.get(ticket.id) : 0),
       percent: parsed.percent,
     })
+    prior.set(ticket.id, parsed.percent)
   })
   const map = new Map()
   latest.forEach((mark) => {

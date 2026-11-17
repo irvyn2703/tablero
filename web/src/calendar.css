@@ -70,6 +70,32 @@
   font-weight: 700;
 }
 
+.percent-shift {
+  display: inline-flex;
+  flex: none;
+  align-items: baseline;
+  gap: 0.16rem;
+  padding: 0 0.32rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+.percent-from {
+  font-weight: 500;
+  opacity: 0.55;
+}
+
+.percent-arrow {
+  font-size: 0.72em;
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+.percent-to { font-weight: 700; }
+
 .closed-title {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -90,9 +116,12 @@
   text-decoration: none;
 }
 
-.mark-keys .closed-percent {
+.mark-keys .closed-percent,
+.mark-keys .percent-shift {
   font-weight: 500;
 }
+
+.mark-keys .percent-to { font-weight: 700; }
 
 .mark-keys a:hover { text-decoration: underline; text-underline-offset: 0.12em; }
 

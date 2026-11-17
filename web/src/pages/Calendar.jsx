@@ -67,6 +67,19 @@ function Bucket({ title, tickets, company, assigneeOf, statusOf, done, extraFor 
   )
 }
 
+function PercentShift({ from, to }) {
+  const start = formatProgress(from)
+  const end = formatProgress(to)
+  if (start === end) return <span className="closed-percent">{end}%</span>
+  return (
+    <span className="percent-shift" aria-label={`de ${start}% a ${end}%`}>
+      <span className="percent-from">{start}</span>
+      <span className="percent-arrow" aria-hidden="true">→</span>
+      <span className="percent-to">{end}%</span>
+    </span>
+  )
+}
+
 function ticketKeys(tickets, company) {
   return tickets.map((ticket) => ticketKey(company.ticket_prefix, ticket.public_number))
 }
@@ -283,20 +296,21 @@ export function Calendar() {
                   <span>{day.getDate()}</span>
                   <div className="marks">
                     {groupDayMarks(marks.get(key) ?? []).map((group) => {
-                      const percents = group.tickets.map((mark) => formatProgress(mark.percent))
-                      const shared = percents.every((percent) => percent === percents[0])
+                      const shifts = group.tickets.map((mark) => `${formatProgress(mark.from)}→${formatProgress(mark.percent)}`)
+                      const shared = shifts.every((shift) => shift === shifts[0])
                       const closed = group.tickets.every((mark) => Number(mark.percent) >= 100)
+                      const sample = group.tickets[0]
                       return (
                         <div key={group.statusName} className={closed ? 'mark closed' : 'mark moved'}>
                           <span className="mark-line">
                             <span className="closed-title">{group.statusName}</span>
-                            {shared && <span className="closed-percent">{percents[0]}%</span>}
+                            {shared && <PercentShift from={sample.from} to={sample.percent} />}
                           </span>
                           <span className="mark-keys">
                             {group.tickets.map((mark) => (
                               <Link key={mark.id} to={`../t/${mark.id}`}>
                                 <span className="closed-key">{ticketKey(company.ticket_prefix, mark.public_number)}</span>
-                                {!shared && <span className="closed-percent">({formatProgress(mark.percent)}%)</span>}
+                                {!shared && <PercentShift from={mark.from} to={mark.percent} />}
                               </Link>
                             ))}
                           </span>
