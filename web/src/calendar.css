@@ -62,8 +62,8 @@
 
 .closed-key { font-weight: 700; }
 
-.kin-role,
-.kin-parent {
+.kin-parent,
+.kin-arrow {
   flex: none;
   color: var(--brass);
   font-size: 0.68rem;
@@ -71,21 +71,13 @@
   line-height: 1.35;
 }
 
-.kin-role {
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.mark-keys a.is-parent,
 .mark-keys a.is-child {
   padding-left: 0.35rem;
   border-left: 2px solid var(--brass);
 }
 
 .mark-keys a.is-child .closed-key,
-.mark-keys a.is-parent .closed-key,
-.mark-keys a.is-child .percent-to,
-.mark-keys a.is-parent .percent-to {
+.mark-keys a.is-child .percent-to {
   color: var(--ink);
 }
 

@@ -248,13 +248,6 @@ export function Calendar() {
     [members],
   )
   const ticketsById = useMemo(() => new Map(tickets.map((ticket) => [ticket.id, ticket])), [tickets])
-  const parentIds = useMemo(() => {
-    const ids = new Set()
-    tickets.forEach((ticket) => {
-      if (ticket.parent_id) ids.add(ticket.parent_id)
-    })
-    return ids
-  }, [tickets])
   const childrenByParent = useMemo(() => {
     const map = new Map()
     tickets.forEach((ticket) => {
@@ -353,12 +346,13 @@ export function Calendar() {
                           <span className="mark-keys">
                             {group.tickets.map((mark) => {
                               const parent = mark.parent_id ? ticketsById.get(mark.parent_id) : null
-                              const isParent = parentIds.has(mark.id)
                               return (
-                                <Link key={mark.id} className={parent ? 'is-child' : isParent ? 'is-parent' : ''} to={`../t/${mark.id}`}>
-                                  {isParent && <span className="kin-role">Padre</span>}
+                                <Link key={mark.id} className={parent ? 'is-child' : ''} to={`../t/${mark.id}`}>
                                   {parent && (
-                                    <span className="kin-parent">{ticketKey(company.ticket_prefix, parent.public_number)}</span>
+                                    <>
+                                      <span className="kin-parent">{ticketKey(company.ticket_prefix, parent.public_number)}</span>
+                                      <span className="kin-arrow" aria-hidden="true">→</span>
+                                    </>
                                   )}
                                   <span className="closed-key">{ticketKey(company.ticket_prefix, mark.public_number)}</span>
                                   {!shared && <PercentShift from={mark.from} to={mark.percent} />}
