@@ -24,7 +24,7 @@ function weeksOf(year, month) {
 function StoryLine({ ticket, company, assignee, extra, done, status }) {
   const name = status?.name || 'Sin estado'
   return (
-    <li>
+    <>
       <Link className={done ? 'story-line is-done' : 'story-line'} to={`../t/${ticket.id}`}>
         <span className="closed-key">{ticketKey(company.ticket_prefix, ticket.public_number)}</span>
         <span className="sprint-copy">
@@ -41,27 +41,52 @@ function StoryLine({ ticket, company, assignee, extra, done, status }) {
         <span>{name}</span>
       </span>
       <Progress value={ticket.progress} />
-    </li>
+    </>
   )
 }
 
-function Bucket({ title, tickets, company, assigneeOf, statusOf, done, extraFor }) {
+function Bucket({ title, tickets, company, assigneeOf, statusOf, done, extraFor, kidsOf }) {
   if (!tickets.length) return null
   return (
     <div>
       <span className="quiet">{title}</span>
       <ul className="sprint-tickets">
-        {tickets.map((ticket) => (
-          <StoryLine
-            key={ticket.id}
-            ticket={ticket}
-            company={company}
-            assignee={assigneeOf(ticket)}
-            status={statusOf(ticket)}
-            done={done}
-            extra={extraFor ? extraFor(ticket) : ''}
-          />
-        ))}
+        {tickets.map((ticket) => {
+          const kids = kidsOf ? kidsOf(ticket.id) : []
+          return (
+            <li key={ticket.id}>
+              <StoryLine
+                ticket={ticket}
+                company={company}
+                assignee={assigneeOf(ticket)}
+                status={statusOf(ticket)}
+                done={done}
+                extra={extraFor ? extraFor(ticket) : ''}
+              />
+              {kids.length > 0 && (
+                <ul className="story-kids">
+                  {kids.map((child) => {
+                    const status = statusOf(child)
+                    const name = status?.name || 'Sin estado'
+                    return (
+                      <li key={child.id}>
+                        <Link className="story-line" to={`../t/${child.id}`}>
+                          <span className="closed-key">{ticketKey(company.ticket_prefix, child.public_number)}</span>
+                          <span className="sprint-title">{child.title}</span>
+                        </Link>
+                        <span className="story-status" style={laneVars(status?.color)} title={name}>
+                          <span className="status-dot" aria-hidden="true" />
+                          <span>{name}</span>
+                        </span>
+                        <span className="story-kid-percent">{formatProgress(child.progress)}%</span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </li>
+          )
+        })}
       </ul>
     </div>
   )
@@ -129,7 +154,7 @@ function laneTone(categoryName) {
   return 'pine'
 }
 
-function SprintDetail({ sprint, span, buckets, tone, editable, company, assigneeOf, statusOf, sprintById }) {
+function SprintDetail({ sprint, span, buckets, tone, editable, company, assigneeOf, statusOf, sprintById, kidsOf }) {
   const filled = [buckets.open, buckets.done, buckets.carried].filter((tickets) => tickets.length).length
   return (
     <div className={`bar-detail tone-${tone}`}>
@@ -141,14 +166,15 @@ function SprintDetail({ sprint, span, buckets, tone, editable, company, assignee
         ? <div className="quiet">Sin tickets. Asígnale este sprint en la ficha.</div>
         : (
           <div className={`sprint-buckets cols-${filled}`}>
-            <Bucket title="Comprometido" tickets={buckets.open} company={company} assigneeOf={assigneeOf} statusOf={statusOf} />
-            <Bucket title="Completo" tickets={buckets.done} company={company} assigneeOf={assigneeOf} statusOf={statusOf} done />
+            <Bucket title="Comprometido" tickets={buckets.open} company={company} assigneeOf={assigneeOf} statusOf={statusOf} kidsOf={kidsOf} />
+            <Bucket title="Completo" tickets={buckets.done} company={company} assigneeOf={assigneeOf} statusOf={statusOf} kidsOf={kidsOf} done />
             <Bucket
               title="Sigue"
               tickets={buckets.carried}
               company={company}
               assigneeOf={assigneeOf}
               statusOf={statusOf}
+              kidsOf={kidsOf}
               extraFor={(ticket) => {
                 const next = sprintById.get(ticket.sprint_id)
                 if (!next || next.id === sprint.id) return ''
@@ -228,6 +254,17 @@ export function Calendar() {
       if (ticket.parent_id) ids.add(ticket.parent_id)
     })
     return ids
+  }, [tickets])
+  const childrenByParent = useMemo(() => {
+    const map = new Map()
+    tickets.forEach((ticket) => {
+      if (!ticket.parent_id) return
+      const list = map.get(ticket.parent_id) || []
+      list.push(ticket)
+      map.set(ticket.parent_id, list)
+    })
+    map.forEach((list) => list.sort((a, b) => a.public_number - b.public_number))
+    return map
   }, [tickets])
   const statusById = useMemo(() => new Map(statuses.map((status) => [status.id, status])), [statuses])
   const sprintById = useMemo(() => new Map(sprints.map((sprint) => [sprint.id, sprint])), [sprints])
@@ -396,6 +433,7 @@ export function Calendar() {
                   assigneeOf={assigneeOf}
                   statusOf={statusOf}
                   sprintById={sprintById}
+                  kidsOf={(parentId) => childrenByParent.get(parentId) || []}
                 />
               )}
             </div>
