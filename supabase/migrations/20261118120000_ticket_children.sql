@@ -1,6 +1,7 @@
 -- A parent ticket is the summary of its children. One level only.
--- The parent's column is the child furthest behind. Its bar is the
--- estimate-weighted average of the children that still count.
+-- The parent's column is the child furthest ahead (see
+-- 20261118140000_parent_leads.sql). Its bar is the estimate-weighted
+-- average of the children that still count.
 -- A pause counts unless that status allows delete: that column is the discard pile.
 
 alter table public.tickets
@@ -602,7 +603,9 @@ begin
 end;
 $$;
 
-create or replace view public.ticket_rows
+drop view if exists public.ticket_rows;
+
+create view public.ticket_rows
 with (security_invoker = true) as
 select
   t.id,
@@ -631,6 +634,8 @@ select
   t.version_id
 from public.tickets t
 join public.statuses s on s.id = t.status_id;
+
+grant select on public.ticket_rows to authenticated;
 
 revoke all on function private.has_children(uuid) from public, anon, authenticated;
 revoke all on function private.estimate_weight(text) from public, anon, authenticated;

@@ -1,6 +1,6 @@
 begin;
 
-select plan(76);
+select plan(79);
 
 insert into public.companies (name, slug)
 values ('Acme', 'acme')
@@ -679,8 +679,8 @@ select private.apply_progress(
 select is(private.measure_progress(:'parent_id'::uuid), 20.6::numeric, 'el padre pesa 3 y 5');
 select is(
   (select s.name from public.statuses s join public.tickets t on t.status_id = s.id where t.id = :'parent_id'::uuid),
-  'Recibido',
-  'el padre se queda en el hijo más atrasado'
+  'En curso',
+  'el padre sigue al hijo que va más adelante'
 );
 
 select private.apply_progress(
@@ -690,10 +690,18 @@ select private.apply_progress(
 );
 
 select is(private.measure_progress(:'parent_id'::uuid), 30::numeric, 'el padre promedia el peso de los dos');
+
+select private.apply_progress(
+  :'child_a'::uuid,
+  (select id from public.statuses where company_id = :'company_id' and name = 'En revisión'),
+  0
+);
+
+select is(private.measure_progress(:'parent_id'::uuid), 45::numeric, 'revisión pesa el tramo previo completo');
 select is(
   (select s.name from public.statuses s join public.tickets t on t.status_id = s.id where t.id = :'parent_id'::uuid),
-  'En curso',
-  'el padre avanza cuando el último hijo sale de recibido'
+  'En revisión',
+  'con un hijo en revisión y otro en curso el padre queda en revisión'
 );
 
 select private.apply_progress(
@@ -704,10 +712,10 @@ select private.apply_progress(
 
 select is(
   (select s.name from public.statuses s join public.tickets t on t.status_id = s.id where t.id = :'parent_id'::uuid),
-  'Falta información',
-  'una pausa que no se puede borrar retiene al padre'
+  'En revisión',
+  'una pausa no adelanta al padre'
 );
-select is(private.measure_progress(:'parent_id'::uuid), 30::numeric, 'la pausa sigue contando en la barra');
+select is(private.measure_progress(:'parent_id'::uuid), 45::numeric, 'la pausa sigue contando en la barra');
 
 select private.apply_progress(
   :'child_b'::uuid,
@@ -715,11 +723,47 @@ select private.apply_progress(
   null
 );
 
-select is(private.measure_progress(:'parent_id'::uuid), 55::numeric, 'el descartado sale de la cuenta');
+select is(private.measure_progress(:'parent_id'::uuid), 95::numeric, 'el descartado sale de la cuenta');
+select is(
+  (select s.name from public.statuses s join public.tickets t on t.status_id = s.id where t.id = :'parent_id'::uuid),
+  'En revisión',
+  'el padre se queda en el hijo que sí cuenta'
+);
+
+select private.apply_progress(
+  :'child_a'::uuid,
+  (select id from public.statuses where company_id = :'company_id' and name = 'Listo'),
+  null
+);
+
+select is(
+  (select s.name from public.statuses s join public.tickets t on t.status_id = s.id where t.id = :'parent_id'::uuid),
+  'Listo',
+  'el padre cierra cuando el único hijo que cuenta ya cerró'
+);
+
+select private.apply_progress(
+  :'child_b'::uuid,
+  (select id from public.statuses where company_id = :'company_id' and name = 'En curso'),
+  0
+);
+
 select is(
   (select s.name from public.statuses s join public.tickets t on t.status_id = s.id where t.id = :'parent_id'::uuid),
   'En curso',
-  'el padre vuelve al hijo que sí cuenta'
+  'el padre no cierra mientras un hijo sigue en un estado anterior'
+);
+
+select private.apply_progress(
+  :'child_b'::uuid,
+  (select id from public.statuses where company_id = :'company_id' and name = 'Falta información'),
+  null
+);
+
+select is(
+  (select s.name from public.statuses s join public.tickets t on t.status_id = s.id where t.id = :'parent_id'::uuid),
+  'Listo',
+  'una pausa deja al padre en cierre'
 );
 
 select throws_ok(

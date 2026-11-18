@@ -36,6 +36,7 @@ export function Board() {
   const { companyId } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const childView = searchParams.get('hijos') || ''
+  const showAll = !childView && searchParams.get('vista') === 'todos'
   const [statuses, setStatuses] = useState([])
   const [tickets, setTickets] = useState([])
   const [error, setError] = useState('')
@@ -66,14 +67,21 @@ export function Board() {
     return map
   }, [tickets])
   const focusParent = tickets.find((ticket) => ticket.id === childView) || null
+  const ticketById = useMemo(() => new Map(tickets.map((ticket) => [ticket.id, ticket])), [tickets])
 
   function onBoard(ticket) {
     if (childView) return ticket.parent_id === childView
+    if (showAll) return true
     return !ticket.parent_id
   }
 
   function mates(list, ticket) {
-    return list.filter((item) => item.status_id === ticket.status_id && onBoard(item))
+    const lane = ticket.parent_id || null
+    return list.filter((item) => (
+      item.status_id === ticket.status_id
+      && onBoard(item)
+      && (item.parent_id || null) === lane
+    ))
   }
 
   useLayoutEffect(() => {
@@ -498,9 +506,22 @@ export function Board() {
           <p className="kicker">{company.slug}</p>
           <h1>{company.name}</h1>
         </div>
-        {editable && <Link className="btn" to="nuevo">Nuevo ticket</Link>}
+        <div className="cluster">
+          {!childView && (
+            <button
+              className={showAll ? 'btn' : 'btn quiet'}
+              type="button"
+              aria-pressed={showAll}
+              onClick={() => setSearchParams(showAll ? {} : { vista: 'todos' })}
+            >
+              {showAll ? 'Solo padres' : 'Padres e hijos'}
+            </button>
+          )}
+          {editable && <Link className="btn" to="nuevo">Nuevo ticket</Link>}
+        </div>
       </div>
       <Alert>{error}</Alert>
+      {showAll && <p className="quiet">Cada columna muestra padres e hijos, para ver en qué estado está cada uno.</p>}
       {childView && (
         <div className="child-banner">
           <p>
@@ -587,9 +608,12 @@ export function Board() {
                       : 'Pausa'}
               </span>
             </header>
-            {visible.map((ticket, index) => {
+            {visible.map((ticket) => {
               const kids = childrenByParent.get(ticket.id) || []
               const isParent = kids.length > 0
+              const parentTicket = ticket.parent_id ? ticketById.get(ticket.parent_id) : null
+              const lane = mates(tickets, ticket)
+              const laneIndex = lane.findIndex((item) => item.id === ticket.id)
               return (
               <article
                 className={[
@@ -602,14 +626,14 @@ export function Board() {
                 data-status={status.id}
                 key={ticket.id}
               >
+                {isParent && <p className="card-banner">Padre</p>}
                 <div className="card-top">
                   <Link className="card-key" to={`t/${ticket.id}`}>
                     <em>{ticketKey(company.ticket_prefix, ticket.public_number)}</em>
                   </Link>
-                  {isParent && <span className="card-role">Padre</span>}
                   {editable && (
                   <div className="card-order">
-                    <button className="btn quiet" type="button" aria-label="Subir" disabled={Boolean(busy) || index === 0} onClick={() => reorder(ticket.id, -1)}>
+                    <button className="btn quiet" type="button" aria-label="Subir" disabled={Boolean(busy) || laneIndex <= 0} onClick={() => reorder(ticket.id, -1)}>
                       <Arrow up />
                     </button>
                     <button
@@ -624,13 +648,16 @@ export function Board() {
                     >
                       <Grip />
                     </button>
-                    <button className="btn quiet" type="button" aria-label="Bajar" disabled={Boolean(busy) || index === columnTickets.length - 1} onClick={() => reorder(ticket.id, 1)}>
+                    <button className="btn quiet" type="button" aria-label="Bajar" disabled={Boolean(busy) || laneIndex < 0 || laneIndex >= lane.length - 1} onClick={() => reorder(ticket.id, 1)}>
                       <Arrow />
                     </button>
                   </div>
                   )}
                 </div>
                 <Link className="card-body" to={`t/${ticket.id}`}>
+                  {parentTicket && (
+                    <span className="card-of">Hijo de {ticketKey(company.ticket_prefix, parentTicket.public_number)}</span>
+                  )}
                   {versionOf(ticket) && <span className="card-version">{versionOf(ticket)}</span>}
                   <p>{ticket.title}</p>
                   <span className="card-who quiet">{assigneeLabel(assigneeById, ticket.assignee_id)}</span>

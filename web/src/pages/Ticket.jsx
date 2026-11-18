@@ -504,7 +504,7 @@ export function Ticket() {
               </li>
             ))}
           </ul>
-          <p className="quiet">El estado y la barra de este ticket los marcan sus hijos.</p>
+          <p className="quiet">El estado lo marca el hijo que va más adelante. El cierre llega cuando ningún hijo sigue en un estado de trabajo; una pausa no lo detiene. La barra es el promedio de los hijos.</p>
         </div>
       )}
       {editable && !ticket.parent_id && (
