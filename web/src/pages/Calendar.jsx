@@ -222,6 +222,13 @@ export function Calendar() {
     [members],
   )
   const ticketsById = useMemo(() => new Map(tickets.map((ticket) => [ticket.id, ticket])), [tickets])
+  const parentIds = useMemo(() => {
+    const ids = new Set()
+    tickets.forEach((ticket) => {
+      if (ticket.parent_id) ids.add(ticket.parent_id)
+    })
+    return ids
+  }, [tickets])
   const statusById = useMemo(() => new Map(statuses.map((status) => [status.id, status])), [statuses])
   const sprintById = useMemo(() => new Map(sprints.map((sprint) => [sprint.id, sprint])), [sprints])
   const storyBySprintId = useMemo(() => {
@@ -307,15 +314,20 @@ export function Calendar() {
                             {shared && <PercentShift from={sample.from} to={sample.percent} />}
                           </span>
                           <span className="mark-keys">
-                            {group.tickets.map((mark) => (
-                              <Link key={mark.id} to={`../t/${mark.id}`}>
-                                {mark.parent_id && (
-                                  <span className="closed-parent">{ticketKey(company.ticket_prefix, ticketsById.get(mark.parent_id)?.public_number)} ·</span>
-                                )}
-                                <span className="closed-key">{ticketKey(company.ticket_prefix, mark.public_number)}</span>
-                                {!shared && <PercentShift from={mark.from} to={mark.percent} />}
-                              </Link>
-                            ))}
+                            {group.tickets.map((mark) => {
+                              const parent = mark.parent_id ? ticketsById.get(mark.parent_id) : null
+                              const isParent = parentIds.has(mark.id)
+                              return (
+                                <Link key={mark.id} className={parent ? 'is-child' : isParent ? 'is-parent' : ''} to={`../t/${mark.id}`}>
+                                  {isParent && <span className="kin-role">Padre</span>}
+                                  {parent && (
+                                    <span className="kin-parent">{ticketKey(company.ticket_prefix, parent.public_number)}</span>
+                                  )}
+                                  <span className="closed-key">{ticketKey(company.ticket_prefix, mark.public_number)}</span>
+                                  {!shared && <PercentShift from={mark.from} to={mark.percent} />}
+                                </Link>
+                              )
+                            })}
                           </span>
                         </div>
                       )

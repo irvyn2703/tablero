@@ -63,9 +63,26 @@
 
 .closed-key { font-weight: 700; }
 
-.closed-parent {
-  font-weight: 500;
-  opacity: 0.65;
+.kin-role,
+.kin-parent {
+  flex: none;
+  padding: 0 0.32rem;
+  border-radius: 999px;
+  background: var(--brass);
+  color: var(--paper);
+  font-size: 0.64rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.kin-role {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mark-keys a.is-child .closed-key,
+.mark-keys a.is-parent .closed-key {
+  color: var(--ink);
 }
 
 .closed-percent {
