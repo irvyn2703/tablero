@@ -64,25 +64,28 @@ function Bucket({ title, tickets, company, assigneeOf, statusOf, done, extraFor,
                 extra={extraFor ? extraFor(ticket) : ''}
               />
               {kids.length > 0 && (
-                <ul className="story-kids">
-                  {kids.map((child) => {
-                    const status = statusOf(child)
-                    const name = status?.name || 'Sin estado'
-                    return (
-                      <li key={child.id}>
-                        <Link className="story-line" to={`../t/${child.id}`}>
-                          <span className="closed-key">{ticketKey(company.ticket_prefix, child.public_number)}</span>
-                          <span className="sprint-title">{child.title}</span>
-                        </Link>
-                        <span className="story-status" style={laneVars(status?.color)} title={name}>
-                          <span className="status-dot" aria-hidden="true" />
-                          <span>{name}</span>
-                        </span>
-                        <span className="story-kid-percent">{formatProgress(child.progress)}%</span>
-                      </li>
-                    )
-                  })}
-                </ul>
+                <details className="story-kids">
+                  <summary>{kids.length === 1 ? '1 hijo' : `${kids.length} hijos`}</summary>
+                  <ul>
+                    {kids.map((child) => {
+                      const status = statusOf(child)
+                      const name = status?.name || 'Sin estado'
+                      return (
+                        <li key={child.id}>
+                          <Link className="story-line" to={`../t/${child.id}`}>
+                            <span className="closed-key">{ticketKey(company.ticket_prefix, child.public_number)}</span>
+                            <span className="sprint-title">{child.title}</span>
+                          </Link>
+                          <span className="story-status" style={laneVars(status?.color)} title={name}>
+                            <span className="status-dot" aria-hidden="true" />
+                            <span>{name}</span>
+                          </span>
+                          <span className="story-kid-percent">{formatProgress(child.progress)}%</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </details>
               )}
             </li>
           )
