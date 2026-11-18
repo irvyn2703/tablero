@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Link, useOutletContext, useParams } from 'react-router-dom'
+import { Link, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { assigneeLabel, canEdit, laneVars, memberName, messageFrom, ticketKey } from '../lib/format'
+import { assigneeLabel, canEdit, formatProgress, laneVars, memberName, messageFrom, ticketKey } from '../lib/format'
 import { discardTicket } from '../lib/files'
 import { ActionButton, Alert, Done, Progress, TicketChips, useFeedback } from '../components/ui'
 
@@ -34,6 +34,8 @@ export function Board() {
   const { company, role, session } = useOutletContext()
   const editable = canEdit(role)
   const { companyId } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const childView = searchParams.get('hijos') || ''
   const [statuses, setStatuses] = useState([])
   const [tickets, setTickets] = useState([])
   const [error, setError] = useState('')
@@ -53,6 +55,26 @@ export function Board() {
   const spots = useRef(new Map())
   const loadGen = useRef(0)
   const { busy, done, mark, run } = useFeedback()
+  const childrenByParent = useMemo(() => {
+    const map = new Map()
+    for (const ticket of tickets) {
+      if (!ticket.parent_id) continue
+      const list = map.get(ticket.parent_id) || []
+      list.push(ticket)
+      map.set(ticket.parent_id, list)
+    }
+    return map
+  }, [tickets])
+  const focusParent = tickets.find((ticket) => ticket.id === childView) || null
+
+  function onBoard(ticket) {
+    if (childView) return ticket.parent_id === childView
+    return !ticket.parent_id
+  }
+
+  function mates(list, ticket) {
+    return list.filter((item) => item.status_id === ticket.status_id && onBoard(item))
+  }
 
   useLayoutEffect(() => {
     const board = boardRef.current
@@ -98,7 +120,7 @@ export function Board() {
     const forCompany = companyId
     const [statusRes, ticketRes, versionRes, versionCategoryRes, categoryRes, linkRes, memberRes] = await Promise.all([
       supabase.from('statuses').select('id, name, kind, position, weight, color, allows_delete').eq('company_id', companyId).order('position'),
-      supabase.from('ticket_rows').select('id, public_number, title, status_id, progress, local_percent, priority, estimate, rank, version_id, assignee_id').eq('company_id', companyId).order('rank'),
+      supabase.from('ticket_rows').select('id, public_number, title, status_id, progress, local_percent, priority, estimate, rank, version_id, assignee_id, parent_id').eq('company_id', companyId).order('rank'),
       supabase.from('versions').select('id, name, category_id').eq('company_id', companyId),
       supabase.from('version_categories').select('id, name').eq('company_id', companyId).order('name'),
       supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
@@ -160,7 +182,7 @@ export function Board() {
   function landingIndex(ticketId, targetId, before) {
     const ticket = tickets.find((item) => item.id === ticketId)
     if (!ticket) return null
-    const column = tickets.filter((item) => item.status_id === ticket.status_id && item.id !== ticketId)
+    const column = mates(tickets, ticket).filter((item) => item.id !== ticketId)
     let index = column.findIndex((item) => item.id === targetId)
     if (index < 0) return null
     if (!before) index += 1
@@ -171,9 +193,7 @@ export function Board() {
     setTickets((current) => {
       const ticket = current.find((item) => item.id === ticketId)
       if (!ticket) return current
-      const column = current
-        .filter((item) => item.status_id === ticket.status_id)
-        .sort((a, b) => a.rank - b.rank)
+      const column = mates(current, ticket).sort((a, b) => a.rank - b.rank)
       const ranks = column.map((item) => item.rank)
       const order = column.filter((item) => item.id !== ticketId)
       let index = targetId
@@ -202,7 +222,7 @@ export function Board() {
       }
       const ticket = tickets.find((item) => item.id === ticketId)
       if (ticket) {
-        const index = tickets.filter((item) => item.status_id === ticket.status_id).findIndex((item) => item.id === ticketId)
+        const index = mates(tickets, ticket).findIndex((item) => item.id === ticketId)
         showThrough(ticket.status_id, index + direction)
       }
       load()
@@ -230,7 +250,7 @@ export function Board() {
   }
 
   function startDrag(event, ticket) {
-    if (busy || event.button > 0) return
+    if (busy || event.button > 0 || childrenByParent.has(ticket.id)) return
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
     dragRef.current = { id: ticket.id, statusId: ticket.status_id, over: null }
@@ -270,7 +290,7 @@ export function Board() {
     }
     if (statusId === drag.statusId) return null
     const ordered = tickets
-      .filter((item) => item.status_id === statusId)
+      .filter((item) => item.status_id === statusId && onBoard(item))
       .sort((a, b) => a.rank - b.rank)
     const lastMounted = cards[cards.length - 1].dataset.ticket
     const lastTicket = ordered[ordered.length - 1]?.id
@@ -311,7 +331,7 @@ export function Board() {
     return run('move', async () => {
       setError('')
       const column = tickets
-        .filter((item) => item.status_id === over.statusId && item.id !== ticketId)
+        .filter((item) => item.status_id === over.statusId && item.id !== ticketId && onBoard(item))
         .sort((a, b) => a.rank - b.rank)
       const targetId = over.targetId || column[column.length - 1]?.id || ''
       const before = over.targetId ? over.before : false
@@ -464,7 +484,7 @@ export function Board() {
       }
       const ticket = tickets.find((item) => item.id === ticketId)
       if (ticket && ticket.status_id !== statusId) {
-        const ahead = tickets.filter((item) => item.status_id === statusId && item.rank < ticket.rank).length
+        const ahead = tickets.filter((item) => item.status_id === statusId && onBoard(item) && item.rank < ticket.rank).length
         showThrough(statusId, ahead)
       }
       load()
@@ -481,6 +501,16 @@ export function Board() {
         {editable && <Link className="btn" to="nuevo">Nuevo ticket</Link>}
       </div>
       <Alert>{error}</Alert>
+      {childView && (
+        <div className="child-banner">
+          <p>
+            {focusParent
+              ? <>Hijos de <strong>{ticketKey(company.ticket_prefix, focusParent.public_number)}</strong> {focusParent.title}</>
+              : 'Ese padre ya no está en el tablero.'}
+          </p>
+          <button className="btn quiet" type="button" onClick={() => setSearchParams({})}>Volver al tablero</button>
+        </div>
+      )}
       {busy === 'move' && <p className="done" role="status">Moviendo el ticket…</p>}
       <Done name={mark} mark={mark}>{done}</Done>
       <div className="cat-bar">
@@ -534,7 +564,7 @@ export function Board() {
       </div>
       <div className="board" ref={boardRef}>
         {statuses.map((status) => {
-          const columnTickets = tickets.filter((ticket) => ticket.status_id === status.id && matches(ticket))
+          const columnTickets = tickets.filter((ticket) => ticket.status_id === status.id && matches(ticket) && onBoard(ticket))
           const limit = Math.min(shown[status.id] ?? PAGE, columnTickets.length)
           const visible = columnTickets.slice(0, limit)
           const hidden = columnTickets.length - visible.length
@@ -557,10 +587,14 @@ export function Board() {
                       : 'Pausa'}
               </span>
             </header>
-            {visible.map((ticket, index) => (
+            {visible.map((ticket, index) => {
+              const kids = childrenByParent.get(ticket.id) || []
+              const isParent = kids.length > 0
+              return (
               <article
                 className={[
                   'card',
+                  isParent ? 'is-parent' : '',
                   draggingId === ticket.id ? 'is-dragging' : '',
                   drop?.targetId === ticket.id ? (drop.before ? 'is-drop-before' : 'is-drop-after') : '',
                 ].filter(Boolean).join(' ')}
@@ -572,6 +606,7 @@ export function Board() {
                   <Link className="card-key" to={`t/${ticket.id}`}>
                     <em>{ticketKey(company.ticket_prefix, ticket.public_number)}</em>
                   </Link>
+                  {isParent && <span className="card-role">Padre</span>}
                   {editable && (
                   <div className="card-order">
                     <button className="btn quiet" type="button" aria-label="Subir" disabled={Boolean(busy) || index === 0} onClick={() => reorder(ticket.id, -1)}>
@@ -581,7 +616,7 @@ export function Board() {
                       className="btn quiet grip"
                       type="button"
                       aria-label="Arrastrar"
-                      disabled={Boolean(busy)}
+                      disabled={Boolean(busy) || isParent}
                       onPointerDown={(event) => startDrag(event, ticket)}
                       onPointerMove={trackDrag}
                       onPointerUp={endDrag}
@@ -609,7 +644,20 @@ export function Board() {
                   <TicketChips priority={ticket.priority} estimate={ticket.estimate} />
                   <Progress value={ticket.progress} />
                 </Link>
-                {editable && (
+                {isParent && (
+                  <div className="card-children">
+                    {kids.map((child) => (
+                      <Link key={child.id} to={`t/${child.id}`}>
+                        <span>{ticketKey(company.ticket_prefix, child.public_number)}</span>
+                        <span>{formatProgress(child.progress)}%</span>
+                      </Link>
+                    ))}
+                    <button className="btn quiet" type="button" onClick={() => setSearchParams({ hijos: ticket.id })}>
+                      Ver hijos
+                    </button>
+                  </div>
+                )}
+                {editable && !isParent && (
                   <label className="field card-move">
                     <span>Pasar a</span>
                     <select
@@ -624,13 +672,14 @@ export function Board() {
                     </select>
                   </label>
                 )}
-                {editable && status.allows_delete && (
+                {editable && !isParent && status.allows_delete && (
                   <button className="btn danger card-delete" type="button" disabled={Boolean(busy)} onClick={() => discard(ticket)}>
                     Eliminar
                   </button>
                 )}
               </article>
-            ))}
+              )
+            })}
             {hidden > 0 && status.kind === 'work' && (
               <ColumnTail limit={limit} onMore={() => reveal(status.id, columnTickets.length)} />
             )}

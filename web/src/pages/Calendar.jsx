@@ -186,7 +186,7 @@ export function Calendar() {
       supabase.from('objectives').select('id, name, category_id').eq('company_id', companyId).order('name'),
       supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
       supabase.from('ticket_sprint_stays').select('ticket_id, sprint_id, outcome').eq('company_id', companyId),
-      supabase.from('ticket_rows').select('id, public_number, title, sprint_id, progress, assignee_id, priority, estimate, status_id, status_name').eq('company_id', companyId),
+      supabase.from('ticket_rows').select('id, public_number, title, sprint_id, progress, assignee_id, priority, estimate, status_id, status_name, parent_id').eq('company_id', companyId),
       supabase.from('statuses').select('id, name, color').eq('company_id', companyId),
       supabase.from('ticket_events').select('ticket_id, body, created_at').eq('company_id', companyId).order('created_at'),
       supabase.from('company_members').select('user_id, alias').eq('company_id', companyId),
@@ -309,6 +309,9 @@ export function Calendar() {
                           <span className="mark-keys">
                             {group.tickets.map((mark) => (
                               <Link key={mark.id} to={`../t/${mark.id}`}>
+                                {mark.parent_id && (
+                                  <span className="closed-parent">{ticketKey(company.ticket_prefix, ticketsById.get(mark.parent_id)?.public_number)} ·</span>
+                                )}
                                 <span className="closed-key">{ticketKey(company.ticket_prefix, mark.public_number)}</span>
                                 {!shared && <PercentShift from={mark.from} to={mark.percent} />}
                               </Link>

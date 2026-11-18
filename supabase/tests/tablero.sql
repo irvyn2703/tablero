@@ -1,6 +1,6 @@
 begin;
 
-select plan(61);
+select plan(76);
 
 insert into public.companies (name, slug)
 values ('Acme', 'acme')
@@ -630,6 +630,154 @@ select is(
   1,
   'el agente elige la ruta cuando el nombre se repite'
 );
+
+update public.statuses
+set allows_delete = true
+where company_id = :'company_id'::uuid
+  and name = 'Descartado';
+
+insert into public.tickets (company_id, public_number, title, status_id, view_token_hash)
+values (
+  :'company_id'::uuid,
+  80,
+  'Tarea grande',
+  (select id from public.statuses where company_id = :'company_id' and name = 'Recibido'),
+  repeat('d', 64)
+)
+returning id as parent_id \gset
+
+insert into public.tickets (company_id, public_number, title, status_id, view_token_hash, parent_id, estimate)
+values (
+  :'company_id'::uuid,
+  81,
+  'Parte mediana',
+  (select id from public.statuses where company_id = :'company_id' and name = 'Recibido'),
+  repeat('e', 64),
+  :'parent_id'::uuid,
+  'm'
+)
+returning id as child_a \gset
+
+insert into public.tickets (company_id, public_number, title, status_id, view_token_hash, parent_id, estimate)
+values (
+  :'company_id'::uuid,
+  82,
+  'Parte grande',
+  (select id from public.statuses where company_id = :'company_id' and name = 'Recibido'),
+  repeat('f', 64),
+  :'parent_id'::uuid,
+  'l'
+)
+returning id as child_b \gset
+
+select private.apply_progress(
+  :'child_a'::uuid,
+  (select id from public.statuses where company_id = :'company_id' and name = 'En curso'),
+  50
+);
+
+select is(private.measure_progress(:'parent_id'::uuid), 20.6::numeric, 'el padre pesa 3 y 5');
+select is(
+  (select s.name from public.statuses s join public.tickets t on t.status_id = s.id where t.id = :'parent_id'::uuid),
+  'Recibido',
+  'el padre se queda en el hijo más atrasado'
+);
+
+select private.apply_progress(
+  :'child_b'::uuid,
+  (select id from public.statuses where company_id = :'company_id' and name = 'En curso'),
+  0
+);
+
+select is(private.measure_progress(:'parent_id'::uuid), 30::numeric, 'el padre promedia el peso de los dos');
+select is(
+  (select s.name from public.statuses s join public.tickets t on t.status_id = s.id where t.id = :'parent_id'::uuid),
+  'En curso',
+  'el padre avanza cuando el último hijo sale de recibido'
+);
+
+select private.apply_progress(
+  :'child_b'::uuid,
+  (select id from public.statuses where company_id = :'company_id' and name = 'Falta información'),
+  null
+);
+
+select is(
+  (select s.name from public.statuses s join public.tickets t on t.status_id = s.id where t.id = :'parent_id'::uuid),
+  'Falta información',
+  'una pausa que no se puede borrar retiene al padre'
+);
+select is(private.measure_progress(:'parent_id'::uuid), 30::numeric, 'la pausa sigue contando en la barra');
+
+select private.apply_progress(
+  :'child_b'::uuid,
+  (select id from public.statuses where company_id = :'company_id' and name = 'Descartado'),
+  null
+);
+
+select is(private.measure_progress(:'parent_id'::uuid), 55::numeric, 'el descartado sale de la cuenta');
+select is(
+  (select s.name from public.statuses s join public.tickets t on t.status_id = s.id where t.id = :'parent_id'::uuid),
+  'En curso',
+  'el padre vuelve al hijo que sí cuenta'
+);
+
+select throws_ok(
+  format(
+    $sql$select private.apply_progress(%L::uuid, null, 10)$sql$,
+    :'parent_id'
+  ),
+  'P0001',
+  'el padre no se mueve a mano'
+);
+
+select throws_ok(
+  format(
+    $sql$update public.tickets set parent_id = %L::uuid where id = %L::uuid$sql$,
+    :'child_b',
+    :'child_a'
+  ),
+  'P0001',
+  'un hijo no tiene hijos'
+);
+
+insert into public.sprints (company_id, name, starts_on, ends_on)
+values (:'company_id'::uuid, 'Quincena', '2026-11-01', '2026-11-14')
+returning id as child_sprint \gset
+
+select throws_ok(
+  format(
+    $sql$update public.tickets set sprint_id = %L::uuid where id = %L::uuid$sql$,
+    :'child_sprint',
+    :'child_a'
+  ),
+  'P0001',
+  'el hijo no lleva sprint'
+);
+
+select throws_ok(
+  format(
+    $sql$select private.delete_ticket_row(%L::uuid)$sql$,
+    :'parent_id'
+  ),
+  'P0001',
+  'no se borra un padre con hijos'
+);
+
+select private.delete_ticket_row(:'child_b'::uuid);
+select private.delete_ticket_row(:'child_a'::uuid);
+
+select is(
+  (select s.name from public.statuses s join public.tickets t on t.status_id = s.id where t.id = :'parent_id'::uuid),
+  'Recibido',
+  'sin hijos el padre vuelve al primer estado'
+);
+select is(
+  (select local_percent from public.tickets where id = :'parent_id'::uuid),
+  0,
+  'sin hijos el porcentaje local vuelve a cero'
+);
+select is(private.measure_progress(:'parent_id'::uuid), 0::numeric, 'sin hijos la barra vuelve a cero');
 
 select * from finish();
 

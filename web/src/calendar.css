@@ -63,6 +63,11 @@
 
 .closed-key { font-weight: 700; }
 
+.closed-parent {
+  font-weight: 500;
+  opacity: 0.65;
+}
+
 .closed-percent {
   flex: none;
   white-space: nowrap;

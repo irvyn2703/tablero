@@ -57,6 +57,49 @@
 
 .card:hover { border-color: var(--brass); }
 
+.card.is-parent { box-shadow: inset 0 0 0 1px var(--brass); }
+
+.card-role {
+  margin-right: auto;
+  color: var(--brass);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.card-children {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.75rem;
+  margin-top: 0.55rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--line);
+}
+
+.card-children a {
+  display: inline-flex;
+  gap: 0.3rem;
+  color: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.card-children a span:last-child {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.child-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.8rem;
+  margin-bottom: 0.8rem;
+}
+
 .card-top {
   display: flex;
   align-items: center;

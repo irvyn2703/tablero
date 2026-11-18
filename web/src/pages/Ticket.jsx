@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { absolutePath, supabase } from '../lib/supabase'
-import { autonomyLabel, canEdit, estimateLabel, formatWhen, memberName, messageFrom, priorityLabel, ticketKey } from '../lib/format'
+import { autonomyLabel, canEdit, estimateLabel, formatProgress, formatWhen, memberName, messageFrom, priorityLabel, ticketKey } from '../lib/format'
 import { discardTicket, openTicketFile, takeFiles, uploadTicketFiles } from '../lib/files'
 import { useLogoUrl } from '../lib/logo'
 import { FilePicker, SavedFiles } from '../components/Files'
@@ -9,6 +9,77 @@ import { RepoChecks } from '../components/RepoChecks'
 import { SprintField, VersionField } from '../components/PlanFields'
 import { Thread } from '../components/Thread'
 import { ActionButton, Alert, Done, Progress, Secret, TicketChips, useFeedback, writeClipboard } from '../components/ui'
+
+function ChildComposer({ ticketId, members, busy, mark, done, run, onError, onCreated }) {
+  const [title, setTitle] = useState('')
+  const [estimate, setEstimate] = useState('m')
+  const [priority, setPriority] = useState('3')
+  const [autonomy, setAutonomy] = useState('suggest')
+  const [assignee, setAssignee] = useState('')
+
+  function create(event) {
+    event.preventDefault()
+    return run('child', async () => {
+      onError('')
+      const { error } = await supabase.rpc('create_child_ticket', {
+        p_parent_id: ticketId,
+        p_title: title.trim(),
+        p_estimate: estimate,
+        p_priority: Number(priority),
+        p_autonomy: autonomy,
+        p_assignee_id: assignee || null,
+      })
+      if (error) {
+        onError(messageFrom(error))
+        return false
+      }
+      setTitle('')
+      onCreated()
+    }, 'Hijo creado.')
+  }
+
+  return (
+    <form className="panel" style={{ marginTop: '0.8rem' }} onSubmit={create}>
+      <span className="quiet">Nuevo hijo</span>
+      <div className="grid-2" style={{ marginTop: '0.6rem' }}>
+        <label className="field">
+          <span>Título</span>
+          <input value={title} onChange={(event) => setTitle(event.target.value)} required disabled={Boolean(busy)} />
+        </label>
+        <label className="field">
+          <span>Tamaño</span>
+          <select value={estimate} onChange={(event) => setEstimate(event.target.value)} disabled={Boolean(busy)}>
+            {Object.entries(estimateLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
+        <label className="field">
+          <span>Prioridad</span>
+          <select value={priority} onChange={(event) => setPriority(event.target.value)} disabled={Boolean(busy)}>
+            {Object.entries(priorityLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
+        <label className="field">
+          <span>Autonomía</span>
+          <select value={autonomy} onChange={(event) => setAutonomy(event.target.value)} disabled={Boolean(busy)}>
+            {Object.entries(autonomyLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
+        <label className="field">
+          <span>Asignado</span>
+          <select value={assignee} onChange={(event) => setAssignee(event.target.value)} disabled={Boolean(busy)}>
+            <option value="">Sin asignar</option>
+            {members.map((member) => <option key={member.user_id} value={member.user_id}>{memberName(member)}</option>)}
+          </select>
+        </label>
+      </div>
+      <p className="quiet">Nace en el primer estado. La rama y los repos se completan en su ficha.</p>
+      <ActionButton name="child" busy={busy} pending="Creando…" className="btn" type="submit" style={{ marginTop: '0.8rem' }}>
+        Crear hijo
+      </ActionButton>
+      <Done name="child" mark={mark}>{done}</Done>
+    </form>
+  )
+}
 
 export function Ticket() {
   const navigate = useNavigate()
@@ -34,10 +105,12 @@ export function Ticket() {
   const [picked, setPicked] = useState([])
   const [error, setError] = useState('')
   const [tracking, setTracking] = useState(null)
+  const [children, setChildren] = useState([])
+  const [parentTicket, setParentTicket] = useState(null)
   const { busy, done, mark, run } = useFeedback()
 
   async function load() {
-    const [ticketRes, statusRes, memberRes, sprintRes, versionRes, versionCategoryRes, repoRes, linkRes, categoryRes, categoryLinkRes, eventRes, messageRes, pullRes, fileRes] = await Promise.all([
+    const [ticketRes, statusRes, memberRes, sprintRes, versionRes, versionCategoryRes, repoRes, linkRes, categoryRes, categoryLinkRes, eventRes, messageRes, pullRes, fileRes, childRes] = await Promise.all([
       supabase.from('ticket_rows').select('*').eq('id', ticketId).maybeSingle(),
       supabase.from('statuses').select('id, name, allows_delete').eq('company_id', companyId).order('position'),
       supabase.from('company_members').select('user_id, alias').eq('company_id', companyId),
@@ -52,14 +125,27 @@ export function Ticket() {
       supabase.from('ticket_messages').select('id, side, author_label, body, created_at').eq('ticket_id', ticketId).order('created_at'),
       supabase.from('pull_requests').select('id, url, created_at').eq('ticket_id', ticketId).order('created_at'),
       supabase.from('ticket_files').select('id, name, mime, byte_size, object_path, created_at').eq('ticket_id', ticketId).order('created_at'),
+      supabase.from('ticket_rows').select('id, public_number, title, progress, status_name').eq('parent_id', ticketId).order('public_number'),
     ])
-    const failed = [ticketRes, statusRes, memberRes, sprintRes, versionRes, versionCategoryRes, repoRes, linkRes, categoryRes, categoryLinkRes, eventRes, messageRes, pullRes, fileRes].find((item) => item.error)
+    const failed = [ticketRes, statusRes, memberRes, sprintRes, versionRes, versionCategoryRes, repoRes, linkRes, categoryRes, categoryLinkRes, eventRes, messageRes, pullRes, fileRes, childRes].find((item) => item.error)
     if (failed) {
       setError(messageFrom(failed.error))
       return
     }
-    setTicket(ticketRes.data)
-    setSavedSprintId(ticketRes.data?.sprint_id || null)
+    const row = ticketRes.data
+    setTicket(row)
+    setSavedSprintId(row?.sprint_id || null)
+    setChildren(childRes.data ?? [])
+    if (row?.parent_id) {
+      const parentRes = await supabase.from('ticket_rows').select('id, public_number, title').eq('id', row.parent_id).maybeSingle()
+      if (parentRes.error) {
+        setError(messageFrom(parentRes.error))
+        return
+      }
+      setParentTicket(parentRes.data)
+    } else {
+      setParentTicket(null)
+    }
     setStatuses(statusRes.data ?? [])
     setMembers(memberRes.data ?? [])
     setSprints(sprintRes.data ?? [])
@@ -147,8 +233,8 @@ export function Ticket() {
         estimate: ticket.estimate,
         autonomy: ticket.autonomy,
         assignee_id: ticket.assignee_id || null,
-        sprint_id: ticket.sprint_id || null,
-        version_id: ticket.version_id || null,
+        sprint_id: ticket.parent_id ? null : (ticket.sprint_id || null),
+        version_id: ticket.parent_id ? null : (ticket.version_id || null),
       }).eq('id', ticketId)
       if (updateError) {
         setError(messageFrom(updateError))
@@ -206,6 +292,8 @@ export function Ticket() {
     }, 'Avance guardado.')
   }
 
+  const hasChildren = children.length > 0
+
   if (!ticket) {
     return (
       <section className="page">
@@ -229,7 +317,7 @@ export function Ticket() {
               Copiar liga de seguimiento
             </ActionButton>
           )}
-          {editable && statuses.some((status) => status.id === ticket.status_id && status.allows_delete) && (
+          {editable && !hasChildren && statuses.some((status) => status.id === ticket.status_id && status.allows_delete) && (
             <button className="btn danger" type="button" disabled={Boolean(busy)} onClick={discard}>
               Eliminar
             </button>
@@ -245,6 +333,11 @@ export function Ticket() {
           : 'Es la misma liga de cuando se reportó.'}
       />
       <Done name="tracking" mark={mark}>{done}</Done>
+      {parentTicket && (
+        <p className="quiet">
+          Hijo de <Link to={`/e/${companyId}/t/${parentTicket.id}`}>{ticketKey(company.ticket_prefix, parentTicket.public_number)} {parentTicket.title}</Link>
+        </p>
+      )}
       <TicketChips priority={ticket.priority} estimate={ticket.estimate} />
       <Progress value={ticket.progress} />
       <Alert>{error}</Alert>
@@ -279,20 +372,24 @@ export function Ticket() {
               {members.map((member) => <option key={member.user_id} value={member.user_id}>{memberName(member)}</option>)}
             </select>
           </label>
-          <SprintField
-            sprints={sprints}
-            value={ticket.sprint_id}
-            keepId={savedSprintId}
-            disabled={!editable}
-            onChange={(sprintId) => patch({ sprint_id: sprintId })}
-          />
-          <VersionField
-            versions={versions}
-            categories={versionCategories}
-            value={ticket.version_id}
-            disabled={!editable}
-            onChange={(versionId) => patch({ version_id: versionId })}
-          />
+          {!ticket.parent_id && (
+            <SprintField
+              sprints={sprints}
+              value={ticket.sprint_id}
+              keepId={savedSprintId}
+              disabled={!editable}
+              onChange={(sprintId) => patch({ sprint_id: sprintId })}
+            />
+          )}
+          {!ticket.parent_id && (
+            <VersionField
+              versions={versions}
+              categories={versionCategories}
+              value={ticket.version_id}
+              disabled={!editable}
+              onChange={(versionId) => patch({ version_id: versionId })}
+            />
+          )}
         </div>
         <RepoChecks
           repos={repos}
@@ -392,6 +489,37 @@ export function Ticket() {
           <Done name="upload" mark={mark}>{done}</Done>
         </form>
       )}
+      {hasChildren && (
+        <div className="panel" style={{ marginTop: '0.8rem' }}>
+          <span className="quiet">Hijos</span>
+          <ul className="child-list">
+            {children.map((child) => (
+              <li key={child.id}>
+                <Link to={`/e/${companyId}/t/${child.id}`}>
+                  <em>{ticketKey(company.ticket_prefix, child.public_number)}</em>
+                  <span>{child.title}</span>
+                </Link>
+                <span>{child.status_name}</span>
+                <span>{formatProgress(child.progress)}%</span>
+              </li>
+            ))}
+          </ul>
+          <p className="quiet">El estado y la barra de este ticket los marcan sus hijos.</p>
+        </div>
+      )}
+      {editable && !ticket.parent_id && (
+        <ChildComposer
+          ticketId={ticketId}
+          members={members}
+          busy={busy}
+          mark={mark}
+          done={done}
+          run={run}
+          onError={setError}
+          onCreated={load}
+        />
+      )}
+      {!hasChildren && (
       <form onSubmit={saveProgress} className="panel" style={{ marginTop: '0.8rem' }}>
         <div className="grid-2">
           <label className="field">
@@ -419,6 +547,7 @@ export function Ticket() {
         )}
         <Done name="progress" mark={mark}>{done}</Done>
       </form>
+      )}
       <Thread
         messages={messages}
         canWrite={editable}

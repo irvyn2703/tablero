@@ -1,4 +1,5 @@
 @import './board.css';
+@import './ticket.css';
 @import './thread.css';
 @import './calendar.css';
 
@@ -642,6 +643,21 @@ h2 { font-size: 1.45rem; margin: 0; }
   color: var(--brass);
   font-style: normal;
   font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.release-kids {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.7rem;
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.release-kids a {
+  display: inline;
+  color: inherit;
   font-weight: 700;
 }
 

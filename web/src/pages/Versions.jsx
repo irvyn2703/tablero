@@ -22,7 +22,7 @@ export function Versions() {
     const [versionRes, categoryRes, ticketRes] = await Promise.all([
       supabase.from('versions').select('id, name, category_id, created_at').eq('company_id', companyId).order('created_at', { ascending: false }),
       supabase.from('version_categories').select('id, name').eq('company_id', companyId).order('name'),
-      supabase.from('ticket_rows').select('id, public_number, title, status_kind, version_id, rank').eq('company_id', companyId).order('rank'),
+      supabase.from('ticket_rows').select('id, public_number, title, status_kind, status_name, version_id, rank, parent_id').eq('company_id', companyId).order('rank'),
     ])
     const failed = [versionRes, categoryRes, ticketRes].find((item) => item.error)
     if (failed) setError(messageFrom(failed.error))
@@ -36,11 +36,15 @@ export function Versions() {
   useEffect(() => { load() }, [companyId])
 
   function inside(versionId) {
-    return tickets.filter((ticket) => ticket.version_id === versionId)
+    return tickets.filter((ticket) => ticket.version_id === versionId && !ticket.parent_id)
+  }
+
+  function childrenOf(parentId) {
+    return tickets.filter((ticket) => ticket.parent_id === parentId)
   }
 
   function available() {
-    return tickets.filter((ticket) => ticket.status_kind === 'close' && !ticket.version_id)
+    return tickets.filter((ticket) => ticket.status_kind === 'close' && !ticket.version_id && !ticket.parent_id)
   }
 
   async function addCategory(event) {
@@ -306,10 +310,21 @@ export function Versions() {
                   <ul>
                     {held.map((ticket) => (
                       <li key={ticket.id}>
-                        <Link to={`/e/${companyId}/t/${ticket.id}`}>
-                          <em>{ticketKey(company.ticket_prefix, ticket.public_number)}</em>
-                          <span>{ticket.title}</span>
-                        </Link>
+                        <div>
+                          <Link to={`/e/${companyId}/t/${ticket.id}`}>
+                            <em>{ticketKey(company.ticket_prefix, ticket.public_number)}</em>
+                            <span>{ticket.title}</span>
+                          </Link>
+                          {childrenOf(ticket.id).length > 0 && (
+                            <p className="release-kids">
+                              {childrenOf(ticket.id).map((child) => (
+                                <Link key={child.id} to={`/e/${companyId}/t/${child.id}`}>
+                                  {ticketKey(company.ticket_prefix, child.public_number)} {child.status_name}
+                                </Link>
+                              ))}
+                            </p>
+                          )}
+                        </div>
                         {editable && (
                           <ActionButton
                             name={`out-${ticket.id}`}
