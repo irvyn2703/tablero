@@ -597,12 +597,18 @@ h2 { font-size: 1.45rem; margin: 0; }
   justify-content: space-between;
   align-items: flex-start;
   gap: 0.8rem;
+  min-width: 0;
+}
+
+.release header > div {
+  min-width: 0;
 }
 
 .release h2 {
   margin: 0.15rem 0 0;
   font-size: 2rem;
   line-height: 0.95;
+  overflow-wrap: anywhere;
 }
 
 .release-count {
@@ -626,14 +632,22 @@ h2 { font-size: 1.45rem; margin: 0; }
   justify-content: space-between;
   align-items: baseline;
   gap: 0.7rem;
+  min-width: 0;
   padding: 0.55rem 0;
   border-bottom: 1px solid var(--line);
+}
+
+.release li > div {
+  min-width: 0;
+  flex: 1;
 }
 
 .release a {
   display: flex;
   gap: 0.45rem;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   color: inherit;
   text-decoration: none;
 }
