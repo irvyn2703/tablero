@@ -51,6 +51,7 @@ export function Board() {
   const userId = session.user.id
   const [pickedCats, setPickedCats] = useState(() => readPickedCats(userId, companyId))
   const [categoryName, setCategoryName] = useState('')
+  const [query, setQuery] = useState('')
   const dragRef = useRef(null)
   const boardRef = useRef(null)
   const spots = useRef(new Map())
@@ -432,6 +433,24 @@ export function Board() {
     return pickedCats.some((id) => ids.includes(id))
   }
 
+  function hitsQuery(ticket) {
+    const text = query.trim().toLowerCase()
+    if (!text) return true
+    const key = ticketKey(company.ticket_prefix, ticket.public_number).toLowerCase()
+    const compact = text.replace(/[\s-]+/g, '')
+    const keyCompact = key.replace(/-/g, '')
+    return ticket.title.toLowerCase().includes(text)
+      || key.includes(text)
+      || keyCompact.includes(compact)
+      || String(ticket.public_number).includes(compact)
+  }
+
+  function listed(ticket) {
+    if (!matches(ticket) || !hitsQuery(ticket)) return false
+    if (query.trim()) return true
+    return onBoard(ticket)
+  }
+
   function toggleCat(id) {
     applyPicked((current) => (
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
@@ -507,6 +526,14 @@ export function Board() {
           <h1>{company.name}</h1>
         </div>
         <div className="cluster">
+          <label className="board-search">
+            <input
+              value={query}
+              placeholder="Buscar ticket"
+              aria-label="Buscar ticket por clave o título"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
           {!childView && (
             <button
               className={showAll ? 'btn' : 'btn quiet'}
@@ -521,7 +548,8 @@ export function Board() {
         </div>
       </div>
       <Alert>{error}</Alert>
-      {showAll && <p className="quiet">Cada columna muestra padres e hijos, para ver en qué estado está cada uno.</p>}
+      {showAll && !query.trim() && <p className="quiet">Cada columna muestra padres e hijos, para ver en qué estado está cada uno.</p>}
+      {query.trim() && <p className="quiet">La búsqueda incluye padres e hijos, por clave o por título.</p>}
       {childView && (
         <div className="child-banner">
           <p>
@@ -585,7 +613,7 @@ export function Board() {
       </div>
       <div className="board" ref={boardRef}>
         {statuses.map((status) => {
-          const columnTickets = tickets.filter((ticket) => ticket.status_id === status.id && matches(ticket) && onBoard(ticket))
+          const columnTickets = tickets.filter((ticket) => ticket.status_id === status.id && listed(ticket))
           const limit = Math.min(shown[status.id] ?? PAGE, columnTickets.length)
           const visible = columnTickets.slice(0, limit)
           const hidden = columnTickets.length - visible.length
