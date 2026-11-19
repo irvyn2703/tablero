@@ -526,14 +526,6 @@ export function Board() {
           <h1>{company.name}</h1>
         </div>
         <div className="cluster">
-          <label className="board-search">
-            <input
-              value={query}
-              placeholder="Buscar ticket"
-              aria-label="Buscar ticket por clave o título"
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
           {!childView && (
             <button
               className={showAll ? 'btn' : 'btn quiet'}
@@ -548,6 +540,14 @@ export function Board() {
         </div>
       </div>
       <Alert>{error}</Alert>
+      <label className="board-search">
+        <input
+          value={query}
+          placeholder="Buscar por clave o título"
+          aria-label="Buscar ticket por clave o título"
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </label>
       {showAll && !query.trim() && <p className="quiet">Cada columna muestra padres e hijos, para ver en qué estado está cada uno.</p>}
       {query.trim() && <p className="quiet">La búsqueda incluye padres e hijos, por clave o por título.</p>}
       {childView && (
