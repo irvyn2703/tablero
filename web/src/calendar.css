@@ -282,11 +282,27 @@ button.bar {
   border-left-color: var(--line);
 }
 
-.bar-brief {
+.bar-glance {
+  display: flex;
   flex: 1 0 100%;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.bar-brief {
+  flex: 1;
+  min-width: 0;
   color: var(--muted);
   font-weight: 500;
   line-height: 1.35;
+}
+
+.bar-glance .bar-size {
+  flex: none;
+  margin-left: auto;
+  text-align: right;
 }
 
 .bar-when {

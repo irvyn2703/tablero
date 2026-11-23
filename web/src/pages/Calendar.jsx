@@ -181,7 +181,6 @@ function briefLine(story) {
     parts.push(`${done} completo`)
     parts.push(`${carried} sigue`)
   }
-  if (story.size) parts.push(story.size)
   return parts.join(' · ')
 }
 
@@ -484,7 +483,8 @@ export function Calendar() {
                 const glance = brief ? briefLine(story) : ''
                 const label = [
                   [sprint.name, story.span].filter((part, index, list) => part && list.indexOf(part) === index).join(' '),
-                  glance || (!brief ? story.size : ''),
+                  glance,
+                  story.size,
                   !brief && story.buckets.open.length ? `comprometido ${ticketKeys(story.buckets.open, company).join(' ')}` : '',
                   !brief && story.buckets.done.length ? `completo ${ticketKeys(story.buckets.done, company).join(' ')}` : '',
                   !brief && story.buckets.carried.length ? `sigue ${ticketKeys(story.buckets.carried, company).join(' ')}` : '',
@@ -505,7 +505,12 @@ export function Calendar() {
                     </span>
                     {!brief && story.size && <span className="bar-size">{story.size}</span>}
                     {!brief && <BarMarks buckets={story.buckets} company={company} />}
-                    {glance && <span className="bar-brief">{glance}</span>}
+                    {brief && (glance || story.size) && (
+                      <span className="bar-glance">
+                        {glance && <span className="bar-brief">{glance}</span>}
+                        {story.size && <span className="bar-size">{story.size}</span>}
+                      </span>
+                    )}
                   </button>
                 )
               })}
