@@ -384,13 +384,8 @@ export function Calendar() {
           key={localDateKey(days[0])}
           ref={current ? currentWeekRef : null}
         >
-          {current && (
-            <p className="week-now">
-              Esta semana
-              <span>{range}</span>
-            </p>
-          )}
           <div className="days">
+            {current && <p className="week-now">Esta semana · {range}</p>}
             {days.map((day) => {
               const key = localDateKey(day)
               const isToday = key === todayKey
