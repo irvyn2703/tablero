@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { groupDayMarks, marksByDay } from '../lib/calendarMarks'
@@ -228,6 +228,7 @@ export function Calendar() {
   const [events, setEvents] = useState([])
   const [members, setMembers] = useState([])
   const [error, setError] = useState('')
+  const [ready, setReady] = useState(false)
   const location = useLocation()
   const [notice, setNotice] = useState('')
   const [openSprintId, setOpenSprintId] = useState(null)
@@ -255,9 +256,14 @@ export function Calendar() {
       setEvents(eventRes.data ?? [])
       setMembers(memberRes.data ?? [])
     }
+    setReady(true)
   }
 
-  useEffect(() => { load() }, [companyId])
+  useEffect(() => {
+    landedOnWeek.current = false
+    setReady(false)
+    load()
+  }, [companyId])
 
   useEffect(() => {
     const text = location.state?.notice
@@ -269,9 +275,9 @@ export function Calendar() {
 
   const weeks = useMemo(() => weeksOf(cursor.year, cursor.month), [cursor])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const week = currentWeekRef.current
-    if (!week) return
+    if (!ready || !week) return
     if (pendingTodayScroll.current) {
       pendingTodayScroll.current = false
       revealWeek(week, 'smooth')
@@ -279,8 +285,8 @@ export function Calendar() {
     }
     if (landedOnWeek.current) return
     landedOnWeek.current = true
-    week.scrollIntoView({ block: 'start' })
-  }, [weeks])
+    revealWeek(week, 'auto')
+  }, [ready, weeks, sprints, tickets])
   const marks = useMemo(() => marksByDay(tickets, events, localDateKey), [tickets, events])
   const assigneeById = useMemo(
     () => new Map(members.map((member) => [member.user_id, memberName(member)])),
