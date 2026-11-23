@@ -168,6 +168,23 @@ function revealWeek(node, behavior) {
   node.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : behavior })
 }
 
+function briefLine(story) {
+  const open = story.buckets.open.length
+  const done = story.buckets.done.length
+  const carried = story.buckets.carried.length
+  const total = open + done + carried
+  if (!total && !story.size) return ''
+  const parts = []
+  if (total) {
+    parts.push(`${Math.round((done / total) * 100)}%`)
+    parts.push(`${open} comprometido`)
+    parts.push(`${done} completo`)
+    parts.push(`${carried} sigue`)
+  }
+  if (story.size) parts.push(story.size)
+  return parts.join(' · ')
+}
+
 function laneTone(categoryName) {
   const name = String(categoryName || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim()
   if (name === 'movil' || name === 'mobile') return 'brass'
@@ -464,9 +481,10 @@ export function Calendar() {
               {bars.map(({ sprint, placed, story }) => {
                 const open = openBar?.sprint.id === sprint.id
                 const brief = place !== 'now'
+                const glance = brief ? briefLine(story) : ''
                 const label = [
                   [sprint.name, story.span].filter((part, index, list) => part && list.indexOf(part) === index).join(' '),
-                  brief ? '' : story.size,
+                  glance || (!brief ? story.size : ''),
                   !brief && story.buckets.open.length ? `comprometido ${ticketKeys(story.buckets.open, company).join(' ')}` : '',
                   !brief && story.buckets.done.length ? `completo ${ticketKeys(story.buckets.done, company).join(' ')}` : '',
                   !brief && story.buckets.carried.length ? `sigue ${ticketKeys(story.buckets.carried, company).join(' ')}` : '',
@@ -487,6 +505,7 @@ export function Calendar() {
                     </span>
                     {!brief && story.size && <span className="bar-size">{story.size}</span>}
                     {!brief && <BarMarks buckets={story.buckets} company={company} />}
+                    {glance && <span className="bar-brief">{glance}</span>}
                   </button>
                 )
               })}
