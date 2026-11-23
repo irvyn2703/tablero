@@ -30,6 +30,28 @@ function storePickedCats(userId, companyId, next) {
   }
 }
 
+function hiddenStatusKey(userId, companyId) {
+  return `tablero-hidden-statuses:${userId}:${companyId}`
+}
+
+function readHiddenStatuses(userId, companyId) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(hiddenStatusKey(userId, companyId)) || '[]')
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((id) => typeof id === 'string' && id.length > 0)
+  } catch {
+    return []
+  }
+}
+
+function storeHiddenStatuses(userId, companyId, next) {
+  try {
+    localStorage.setItem(hiddenStatusKey(userId, companyId), JSON.stringify(next))
+  } catch {
+    // The choice still holds for this visit.
+  }
+}
+
 export function Board() {
   const { company, role, session } = useOutletContext()
   const editable = canEdit(role)
@@ -50,6 +72,7 @@ export function Board() {
   const [members, setMembers] = useState([])
   const userId = session.user.id
   const [pickedCats, setPickedCats] = useState(() => readPickedCats(userId, companyId))
+  const [hiddenStatuses, setHiddenStatuses] = useState(() => readHiddenStatuses(userId, companyId))
   const [categoryName, setCategoryName] = useState('')
   const [query, setQuery] = useState('')
   const dragRef = useRef(null)
@@ -155,11 +178,18 @@ export function Board() {
       if (next.length !== current.length) storePickedCats(forUser, forCompany, next)
       return next
     })
+    const knownStatuses = new Set((statusRes.data ?? []).map((item) => item.id))
+    setHiddenStatuses((current) => {
+      const next = current.filter((id) => knownStatuses.has(id))
+      if (next.length !== current.length) storeHiddenStatuses(forUser, forCompany, next)
+      return next
+    })
   }
 
   useEffect(() => {
     setShown({})
     setPickedCats(readPickedCats(userId, companyId))
+    setHiddenStatuses(readHiddenStatuses(userId, companyId))
     load()
   }, [companyId, userId])
 
@@ -481,6 +511,14 @@ export function Board() {
   })
   const ticketTotal = columns.reduce((sum, column) => sum + column.columnTickets.length, 0)
 
+  function toggleStatus(id) {
+    setHiddenStatuses((current) => {
+      const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+      storeHiddenStatuses(userId, companyId, next)
+      return next
+    })
+  }
+
   function toggleCat(id) {
     applyPicked((current) => (
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
@@ -646,17 +684,28 @@ export function Board() {
           <strong>{ticketTotal}</strong> {ticketTotal === 1 ? 'ticket' : 'tickets'}
           <span className="quiet"> · {appliedFilter()}</span>
         </p>
-        <ul aria-label="Tickets por estado">
-          {columns.map(({ status, columnTickets }) => (
-            <li key={status.id} style={laneVars(status.color)}>
-              <span>{status.name}</span>
-              <strong>{columnTickets.length}</strong>
-            </li>
-          ))}
+        <ul aria-label="Mostrar u ocultar estados">
+          {columns.map(({ status, columnTickets }) => {
+            const shownStatus = !hiddenStatuses.includes(status.id)
+            return (
+              <li key={status.id}>
+                <button
+                  type="button"
+                  className={shownStatus ? '' : 'is-off'}
+                  style={shownStatus ? laneVars(status.color) : undefined}
+                  aria-pressed={shownStatus}
+                  onClick={() => toggleStatus(status.id)}
+                >
+                  <span>{status.name}</span>
+                  <strong>{columnTickets.length}</strong>
+                </button>
+              </li>
+            )
+          })}
         </ul>
       </div>
       <div className="board" ref={boardRef}>
-        {columns.map(({ status, columnTickets, limit, visible, hidden }) => {
+        {columns.filter(({ status }) => !hiddenStatuses.includes(status.id)).map(({ status, columnTickets, limit, visible, hidden }) => {
           return (
           <section
             className={drop?.statusId === status.id && !drop.targetId ? 'column is-drop' : 'column'}
@@ -666,16 +715,7 @@ export function Board() {
           >
             <header>
               <strong>{status.name}</strong>
-              <span className="quiet">
-                <span className="column-count">{columnTickets.length}</span>
-                {hidden > 0
-                  ? ` · ${visible.length} a la vista`
-                  : status.kind === 'work'
-                    ? ` · ${status.weight}%`
-                    : status.kind === 'close'
-                      ? ' · Cierre'
-                      : ' · Pausa'}
-              </span>
+              <span className="column-count">{columnTickets.length}</span>
             </header>
             {visible.map((ticket) => {
               const kids = childrenByParent.get(ticket.id) || []
