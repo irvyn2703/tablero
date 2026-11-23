@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { groupDayMarks, marksByDay } from '../lib/calendarMarks'
@@ -8,10 +8,14 @@ import { Alert, Progress, TicketChips } from '../components/ui'
 
 const weekday = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
+function mondayOf(date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7))
+  return start
+}
+
 function weeksOf(year, month) {
-  const first = new Date(year, month, 1)
-  const start = new Date(first)
-  start.setDate(1 - ((first.getDay() + 6) % 7))
+  const start = mondayOf(new Date(year, month, 1))
   return Array.from({ length: 6 }, (_, week) => (
     Array.from({ length: 7 }, (_, day) => {
       const date = new Date(start)
@@ -19,6 +23,13 @@ function weeksOf(year, month) {
       return date
     })
   ))
+}
+
+function currentWeekSpan(now) {
+  const start = mondayOf(now)
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+  return sprintSpan({ starts_on: localDateKey(start), ends_on: localDateKey(end) })
 }
 
 function StoryLine({ ticket, company, assignee, extra, done, status }) {
@@ -151,6 +162,12 @@ function weekHolds(date, days) {
   return date >= localDateKey(days[0]) && date <= localDateKey(days[6])
 }
 
+function revealWeek(node, behavior) {
+  if (!node) return
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  node.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : behavior })
+}
+
 function laneTone(categoryName) {
   const name = String(categoryName || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim()
   if (name === 'movil' || name === 'mobile') return 'brass'
@@ -195,6 +212,12 @@ export function Calendar() {
   const { company, role } = useOutletContext()
   const editable = canEdit(role)
   const today = new Date()
+  const todayKey = localDateKey(today)
+  const todayLabel = new Intl.DateTimeFormat('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }).format(today)
+  const weekLabel = currentWeekSpan(today)
+  const currentWeekRef = useRef(null)
+  const landedOnWeek = useRef(false)
+  const pendingTodayScroll = useRef(false)
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() })
   const [sprints, setSprints] = useState([])
   const [objectives, setObjectives] = useState([])
@@ -245,6 +268,19 @@ export function Calendar() {
   }, [location.state])
 
   const weeks = useMemo(() => weeksOf(cursor.year, cursor.month), [cursor])
+
+  useEffect(() => {
+    const week = currentWeekRef.current
+    if (!week) return
+    if (pendingTodayScroll.current) {
+      pendingTodayScroll.current = false
+      revealWeek(week, 'smooth')
+      return
+    }
+    if (landedOnWeek.current) return
+    landedOnWeek.current = true
+    week.scrollIntoView({ block: 'start' })
+  }, [weeks])
   const marks = useMemo(() => marksByDay(tickets, events, localDateKey), [tickets, events])
   const assigneeById = useMemo(
     () => new Map(members.map((member) => [member.user_id, memberName(member)])),
@@ -307,15 +343,28 @@ export function Calendar() {
     setCursor({ year: next.getFullYear(), month: next.getMonth() })
   }
 
+  function goToday() {
+    const now = new Date()
+    const same = cursor.year === now.getFullYear() && cursor.month === now.getMonth()
+    if (!same) {
+      pendingTodayScroll.current = true
+      setCursor({ year: now.getFullYear(), month: now.getMonth() })
+      return
+    }
+    revealWeek(currentWeekRef.current, 'smooth')
+  }
+
   return (
     <section className="page">
       <div className="row">
         <div>
           <p className="kicker">Calendario</p>
           <h1 style={{ textTransform: 'capitalize' }}>{title}</h1>
+          <p className="week-caption">Hoy, {todayLabel}. Esta semana, <strong>{weekLabel}</strong>.</p>
         </div>
         <div className="cluster">
           {editable && <Link className="btn" to="nuevo">Nuevo sprint</Link>}
+          <button className="btn quiet" type="button" onClick={goToday}>Hoy</button>
           <button className="btn quiet" type="button" onClick={() => shift(-1)}>Anterior</button>
           <button className="btn quiet" type="button" onClick={() => shift(1)}>Siguiente</button>
         </div>
@@ -326,14 +375,33 @@ export function Calendar() {
       <div className="days" style={{ marginBottom: '0.4rem' }}>
         {weekday.map((day) => <span key={day} className="quiet">{day}</span>)}
       </div>
-      {weeks.map((days) => (
-        <div className="calendar-week" key={localDateKey(days[0])}>
+      {weeks.map((days) => {
+        const current = weekHolds(todayKey, days)
+        const range = sprintSpan({ starts_on: localDateKey(days[0]), ends_on: localDateKey(days[6]) })
+        return (
+        <div
+          className={current ? 'calendar-week is-current' : 'calendar-week'}
+          key={localDateKey(days[0])}
+          ref={current ? currentWeekRef : null}
+        >
+          {current && (
+            <p className="week-now">
+              Esta semana
+              <span>{range}</span>
+            </p>
+          )}
           <div className="days">
             {days.map((day) => {
               const key = localDateKey(day)
+              const isToday = key === todayKey
+              const inMonth = day.getMonth() === cursor.month
               return (
-                <div key={key} className={day.getMonth() === cursor.month ? 'day' : 'day out'}>
-                  <span>{day.getDate()}</span>
+                <div
+                  key={key}
+                  className={['day', inMonth ? '' : 'out', isToday ? 'is-today' : ''].filter(Boolean).join(' ')}
+                  aria-current={isToday ? 'date' : undefined}
+                >
+                  <span>{day.getDate()}{isToday && <span className="menu-label">, hoy</span>}</span>
                   <div className="marks">
                     {groupDayMarks(marks.get(key) ?? []).map((group) => {
                       const shifts = group.tickets.map((mark) => `${formatProgress(mark.from)}→${formatProgress(mark.percent)}`)
@@ -437,7 +505,8 @@ export function Calendar() {
             )
           })}
         </div>
-      ))}
+        )
+      })}
       </div>
     </section>
   )

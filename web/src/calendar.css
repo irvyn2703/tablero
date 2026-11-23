@@ -2,6 +2,49 @@
 
 .calendar-week { margin-bottom: 1rem; }
 
+.week-caption {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.week-caption strong {
+  color: var(--pine);
+  font-weight: 700;
+}
+
+.calendar-week.is-current {
+  padding: 0.55rem 0 0.35rem;
+  scroll-margin-top: 0.85rem;
+  background: color-mix(in srgb, var(--pine) 8%, var(--panel));
+  box-shadow: inset 3px 0 0 var(--pine);
+}
+
+@media (max-width: 860px) {
+  .calendar-week.is-current { scroll-margin-top: 5.75rem; }
+}
+
+.week-now {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.35rem 0.8rem;
+  margin: 0 0 0.4rem;
+  color: var(--pine);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.week-now span {
+  color: var(--ink);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .days, .bar-row {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -149,6 +192,19 @@
 .mark-keys a:hover { text-decoration: underline; text-underline-offset: 0.12em; }
 
 .day.out { opacity: 0.35; }
+
+.day.out.is-today { opacity: 1; }
+
+.day.is-today > span:first-child {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.7rem;
+  height: 1.7rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: var(--pine);
+  color: var(--paper);
+}
 
 .bar-row { margin-top: 0.15rem; }
 
