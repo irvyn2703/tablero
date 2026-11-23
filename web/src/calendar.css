@@ -219,6 +219,7 @@
 
 .objective-head.tone-brass { color: var(--brass); }
 .objective-head.tone-pine { color: var(--pine); }
+.objective-head.is-past { color: var(--muted); }
 
 .sprint-buckets {
   display: grid;
@@ -269,6 +270,17 @@ button.bar {
 }
 
 .bar.is-open { box-shadow: inset 0 0 0 1px currentColor; }
+
+.bar.is-past,
+.bar.is-next {
+  padding: 0.1rem 0.45rem;
+  background: transparent;
+}
+
+.bar.is-past {
+  color: var(--muted);
+  border-left-color: var(--line);
+}
 
 .bar-when {
   display: flex;

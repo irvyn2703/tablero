@@ -446,6 +446,7 @@ export function Calendar() {
             const starts = lane.objective ? startByObjectiveId.get(lane.objective.id) || '' : ''
             const namedHere = Boolean(lane.objective) && Boolean(starts) && weekHolds(starts, days)
             const weekKey = localDateKey(days[0])
+            const place = current ? 'now' : localDateKey(days[6]) < todayKey ? 'past' : 'next'
             const bars = lane.sprints.flatMap((sprint) => {
               const placed = placeSprint(sprint, days)
               const story = storyBySprintId.get(sprint.id)
@@ -455,25 +456,26 @@ export function Calendar() {
             return (
             <div className={namedHere || !lane.objective ? 'bar-row' : 'bar-row is-continued'} key={lane.key}>
               {namedHere && (
-                <div className={`objective-head tone-${tone}`}>
+                <div className={`objective-head tone-${tone}${place === 'past' ? ' is-past' : ''}`}>
                   <strong>{lane.objective.name}</strong>
                   {category?.name && <span className="quiet">{category.name}</span>}
                 </div>
               )}
               {bars.map(({ sprint, placed, story }) => {
                 const open = openBar?.sprint.id === sprint.id
+                const brief = place !== 'now'
                 const label = [
                   [sprint.name, story.span].filter((part, index, list) => part && list.indexOf(part) === index).join(' '),
-                  story.size,
-                  story.buckets.open.length ? `comprometido ${ticketKeys(story.buckets.open, company).join(' ')}` : '',
-                  story.buckets.done.length ? `completo ${ticketKeys(story.buckets.done, company).join(' ')}` : '',
-                  story.buckets.carried.length ? `sigue ${ticketKeys(story.buckets.carried, company).join(' ')}` : '',
+                  brief ? '' : story.size,
+                  !brief && story.buckets.open.length ? `comprometido ${ticketKeys(story.buckets.open, company).join(' ')}` : '',
+                  !brief && story.buckets.done.length ? `completo ${ticketKeys(story.buckets.done, company).join(' ')}` : '',
+                  !brief && story.buckets.carried.length ? `sigue ${ticketKeys(story.buckets.carried, company).join(' ')}` : '',
                 ].filter(Boolean).join(', ')
                 return (
                   <button
                     key={sprint.id}
                     type="button"
-                    className={`bar slim tone-${tone}${open ? ' is-open' : ''}`}
+                    className={`bar slim tone-${tone}${brief ? ` is-${place}` : ''}${open ? ' is-open' : ''}`}
                     style={{ gridColumn: `${placed.from + 1} / ${placed.to + 2}` }}
                     aria-expanded={open}
                     aria-label={label}
@@ -481,10 +483,10 @@ export function Calendar() {
                   >
                     <span className="bar-when">
                       <span className="bar-sprint">{sprint.name || story.span}</span>
-                      {story.span && story.span !== sprint.name && <span className="bar-span">{story.span}</span>}
+                      {!brief && story.span && story.span !== sprint.name && <span className="bar-span">{story.span}</span>}
                     </span>
-                    {story.size && <span className="bar-size">{story.size}</span>}
-                    <BarMarks buckets={story.buckets} company={company} />
+                    {!brief && story.size && <span className="bar-size">{story.size}</span>}
+                    {!brief && <BarMarks buckets={story.buckets} company={company} />}
                   </button>
                 )
               })}
