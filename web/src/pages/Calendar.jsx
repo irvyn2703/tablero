@@ -173,21 +173,17 @@ function ticketProgress(ticket) {
   return Number.isFinite(n) ? n : 0
 }
 
-function briefLine(story) {
+function briefStats(story) {
   const open = story.buckets.open.length
   const done = story.buckets.done.length
   const carried = story.buckets.carried.length
   const tickets = [...story.buckets.open, ...story.buckets.done, ...story.buckets.carried]
-  if (!tickets.length && !story.size) return ''
-  const parts = []
-  if (tickets.length) {
-    const average = tickets.reduce((sum, ticket) => sum + ticketProgress(ticket), 0) / tickets.length
-    parts.push(`${formatProgress(average)}%`)
-    parts.push(`${open} comprometido`)
-    parts.push(`${done} completo`)
-    parts.push(`${carried} sigue`)
+  if (!tickets.length) return { percent: null, counts: '' }
+  const percent = tickets.reduce((sum, ticket) => sum + ticketProgress(ticket), 0) / tickets.length
+  return {
+    percent,
+    counts: `${open} comprometido · ${done} completo · ${carried} sigue`,
   }
-  return parts.join(' · ')
 }
 
 function laneTone(categoryName) {
@@ -486,10 +482,11 @@ export function Calendar() {
               {bars.map(({ sprint, placed, story }) => {
                 const open = openBar?.sprint.id === sprint.id
                 const brief = place !== 'now'
-                const glance = brief ? briefLine(story) : ''
+                const stats = brief ? briefStats(story) : { percent: null, counts: '' }
                 const label = [
                   [sprint.name, story.span].filter((part, index, list) => part && list.indexOf(part) === index).join(' '),
-                  glance,
+                  stats.percent == null ? '' : `${formatProgress(stats.percent)}%`,
+                  stats.counts,
                   story.size,
                   !brief && story.buckets.open.length ? `comprometido ${ticketKeys(story.buckets.open, company).join(' ')}` : '',
                   !brief && story.buckets.done.length ? `completo ${ticketKeys(story.buckets.done, company).join(' ')}` : '',
@@ -511,9 +508,10 @@ export function Calendar() {
                     </span>
                     {!brief && story.size && <span className="bar-size">{story.size}</span>}
                     {!brief && <BarMarks buckets={story.buckets} company={company} />}
-                    {brief && (glance || story.size) && (
+                    {brief && (stats.percent != null || stats.counts || story.size) && (
                       <span className="bar-glance">
-                        {glance && <span className="bar-brief">{glance}</span>}
+                        {stats.percent != null && <Progress value={stats.percent} />}
+                        {stats.counts && <span className="bar-brief">{stats.counts}</span>}
                         {story.size && <span className="bar-size">{story.size}</span>}
                       </span>
                     )}

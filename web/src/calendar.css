@@ -291,6 +291,14 @@ button.bar {
   min-width: 0;
 }
 
+.bar-glance .meter {
+  flex: 1 1 8.5rem;
+  max-width: 11rem;
+  margin: 0;
+}
+
+.bar-glance .meter b { height: 4px; }
+
 .bar-brief {
   flex: 1;
   min-width: 0;
