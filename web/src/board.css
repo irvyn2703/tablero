@@ -239,7 +239,56 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.55rem 0.8rem;
-  margin: 0 0 1rem;
+  margin: 0 0 0.85rem;
+}
+
+.board-counts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.8rem;
+  margin: 0 0 0.9rem;
+}
+
+.board-counts > p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.board-counts .quiet { white-space: normal; }
+
+.board-counts ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.board-counts li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.16rem 0.5rem 0.16rem 0.55rem;
+  border-radius: 999px;
+  background: var(--lane, var(--paper-deep));
+  color: var(--lane-ink, var(--ink));
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.board-counts li span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.board-counts li strong,
+.column-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }
 
 .cat-list {

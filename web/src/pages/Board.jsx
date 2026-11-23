@@ -451,6 +451,36 @@ export function Board() {
     return onBoard(ticket)
   }
 
+  function appliedFilter() {
+    const parts = []
+    if (query.trim()) {
+      parts.push('padres e hijos', 'búsqueda')
+    } else if (childView) {
+      parts.push(focusParent
+        ? `hijos de ${ticketKey(company.ticket_prefix, focusParent.public_number)}`
+        : 'hijos')
+    } else if (showAll) {
+      parts.push('padres e hijos')
+    } else {
+      parts.push('solo padres')
+    }
+    if (pickedCats.length) {
+      const names = pickedCats.map((id) => (
+        id === UNCATEGORIZED ? 'Sin categoría' : categories.find((category) => category.id === id)?.name
+      )).filter(Boolean)
+      if (names.length) parts.push(names.join(', '))
+    }
+    return parts.join(' · ')
+  }
+
+  const columns = statuses.map((status) => {
+    const columnTickets = tickets.filter((ticket) => ticket.status_id === status.id && listed(ticket))
+    const limit = Math.min(shown[status.id] ?? PAGE, columnTickets.length)
+    const visible = columnTickets.slice(0, limit)
+    return { status, columnTickets, limit, visible, hidden: columnTickets.length - visible.length }
+  })
+  const ticketTotal = columns.reduce((sum, column) => sum + column.columnTickets.length, 0)
+
   function toggleCat(id) {
     applyPicked((current) => (
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
@@ -611,12 +641,22 @@ export function Board() {
           </form>
         )}
       </div>
+      <div className="board-counts" aria-live="polite">
+        <p>
+          <strong>{ticketTotal}</strong> {ticketTotal === 1 ? 'ticket' : 'tickets'}
+          <span className="quiet"> · {appliedFilter()}</span>
+        </p>
+        <ul aria-label="Tickets por estado">
+          {columns.map(({ status, columnTickets }) => (
+            <li key={status.id} style={laneVars(status.color)}>
+              <span>{status.name}</span>
+              <strong>{columnTickets.length}</strong>
+            </li>
+          ))}
+        </ul>
+      </div>
       <div className="board" ref={boardRef}>
-        {statuses.map((status) => {
-          const columnTickets = tickets.filter((ticket) => ticket.status_id === status.id && listed(ticket))
-          const limit = Math.min(shown[status.id] ?? PAGE, columnTickets.length)
-          const visible = columnTickets.slice(0, limit)
-          const hidden = columnTickets.length - visible.length
+        {columns.map(({ status, columnTickets, limit, visible, hidden }) => {
           return (
           <section
             className={drop?.statusId === status.id && !drop.targetId ? 'column is-drop' : 'column'}
@@ -627,13 +667,14 @@ export function Board() {
             <header>
               <strong>{status.name}</strong>
               <span className="quiet">
+                <span className="column-count">{columnTickets.length}</span>
                 {hidden > 0
-                  ? `${visible.length} de ${columnTickets.length}`
+                  ? ` · ${visible.length} a la vista`
                   : status.kind === 'work'
-                    ? `${status.weight}%`
+                    ? ` · ${status.weight}%`
                     : status.kind === 'close'
-                      ? 'Cierre'
-                      : 'Pausa'}
+                      ? ' · Cierre'
+                      : ' · Pausa'}
               </span>
             </header>
             {visible.map((ticket) => {
