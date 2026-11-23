@@ -168,15 +168,21 @@ function revealWeek(node, behavior) {
   node.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : behavior })
 }
 
+function ticketProgress(ticket) {
+  const n = Number(ticket.progress)
+  return Number.isFinite(n) ? n : 0
+}
+
 function briefLine(story) {
   const open = story.buckets.open.length
   const done = story.buckets.done.length
   const carried = story.buckets.carried.length
-  const total = open + done + carried
-  if (!total && !story.size) return ''
+  const tickets = [...story.buckets.open, ...story.buckets.done, ...story.buckets.carried]
+  if (!tickets.length && !story.size) return ''
   const parts = []
-  if (total) {
-    parts.push(`${Math.round((done / total) * 100)}%`)
+  if (tickets.length) {
+    const average = tickets.reduce((sum, ticket) => sum + ticketProgress(ticket), 0) / tickets.length
+    parts.push(`${formatProgress(average)}%`)
     parts.push(`${open} comprometido`)
     parts.push(`${done} completo`)
     parts.push(`${carried} sigue`)
