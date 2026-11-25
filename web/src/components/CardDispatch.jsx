@@ -4,9 +4,9 @@ import { localDateKey, memberName, sprintSpan } from '../lib/format'
 import { sprintChoices, versionGroups } from './PlanFields'
 
 const FIELDS = [
-  { id: 'assignee', empty: 'Asignar', idle: 'Sin asignar', noun: 'persona', tone: 'is-person' },
-  { id: 'version', empty: 'Versión', idle: 'Sin versión', noun: 'versión', tone: 'is-version' },
-  { id: 'sprint', empty: 'Sprint', idle: 'Backlog', noun: 'sprint', tone: 'is-sprint' },
+  { id: 'assignee', kicker: 'Persona', empty: 'Asignar', idle: 'Sin asignar', noun: 'persona', tone: 'is-person' },
+  { id: 'version', kicker: 'Versión', empty: 'Elegir', idle: 'Sin versión', noun: 'versión', tone: 'is-version' },
+  { id: 'sprint', kicker: 'Sprint', empty: 'Elegir', idle: 'Backlog', noun: 'sprint', tone: 'is-sprint' },
 ]
 
 function fold(value) {
@@ -54,6 +54,13 @@ function sprintOptions(sprints, selectedId, query) {
     .filter((group) => group.items.length)
 }
 
+function versionFace(versions, categories, versionId) {
+  const version = versions.find((item) => item.id === versionId)
+  if (!version) return { kicker: 'Versión', name: '' }
+  const category = categories.find((item) => item.id === version.category_id)
+  return { kicker: category?.name || 'Versión', name: version.name }
+}
+
 function optionCount(groups) {
   return groups.reduce((total, group) => total + group.items.length, 0)
 }
@@ -92,7 +99,6 @@ export function CardDispatch({
   assigneeName,
   members,
   versionId,
-  versionName,
   versions,
   versionCategories,
   sprintId,
@@ -111,7 +117,7 @@ export function CardDispatch({
   const fields = FIELDS.filter((field) => !isChild || field.id === 'assignee')
   const values = {
     assignee: { id: assigneeId || '', name: assigneeName || '' },
-    version: { id: versionId || '', name: versionName || '' },
+    version: { id: versionId || '', ...versionFace(versions, versionCategories, versionId) },
     sprint: { id: sprintId || '', name: sprintName || '' },
   }
   const open = fields.find((field) => field.id === openField) || null
@@ -201,14 +207,21 @@ export function CardDispatch({
     >
       {fields.map((field) => {
         const value = values[field.id]
+        const kicker = value.kicker || field.kicker
         const label = value.name || (editable ? field.empty : field.idle)
         const className = [
           'dispatch-cell',
           value.name ? field.tone : 'is-empty',
           open?.id === field.id ? 'is-open' : '',
         ].filter(Boolean).join(' ')
+        const body = (
+          <>
+            <span className="dispatch-kicker">{kicker}</span>
+            <span className="dispatch-value">{label}</span>
+          </>
+        )
         if (!editable) {
-          return <span className={className} key={field.id}>{label}</span>
+          return <span className={className} key={field.id}>{body}</span>
         }
         return (
           <button
@@ -217,10 +230,10 @@ export function CardDispatch({
             key={field.id}
             disabled={disabled}
             aria-expanded={open?.id === field.id}
-            aria-label={value.name ? `${field.noun.charAt(0).toLocaleUpperCase('es')}${field.noun.slice(1)}: ${value.name}` : field.empty}
+            aria-label={value.name ? `${kicker}: ${value.name}` : `${kicker}. ${field.empty}`}
             onClick={() => onOpen(open?.id === field.id ? '' : field.id)}
           >
-            {label}
+            {body}
           </button>
         )
       })}

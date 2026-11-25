@@ -449,14 +449,6 @@ export function Board() {
     [members],
   )
 
-  function versionOf(ticket) {
-    if (!ticket.version_id) return ''
-    const version = versions.find((item) => item.id === ticket.version_id)
-    if (!version) return ''
-    const category = versionCategories.find((item) => item.id === version.category_id)
-    return category ? `${category.name} ${version.name}` : version.name
-  }
-
   function sprintOf(ticket) {
     if (!ticket.sprint_id) return ''
     const sprint = sprints.find((item) => item.id === ticket.sprint_id)
@@ -795,7 +787,6 @@ export function Board() {
                   assigneeName={ticket.assignee_id ? assigneeLabel(assigneeById, ticket.assignee_id) : ''}
                   members={members}
                   versionId={ticket.version_id}
-                  versionName={versionOf(ticket)}
                   versions={versions}
                   versionCategories={versionCategories}
                   sprintId={ticket.sprint_id}
