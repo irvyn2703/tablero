@@ -1,6 +1,6 @@
 import { localDateKey, sprintSpan } from '../lib/format'
 
-function sprintChoices(sprints, selectedId, today) {
+export function sprintChoices(sprints, selectedId, today) {
   const current = []
   const upcoming = []
   const previous = []
@@ -18,7 +18,7 @@ function sprintChoices(sprints, selectedId, today) {
   ].filter(Boolean)
 }
 
-function versionGroups(versions, categories) {
+export function versionGroups(versions, categories) {
   return [
     ...categories.map((category) => ({
       key: category.id,

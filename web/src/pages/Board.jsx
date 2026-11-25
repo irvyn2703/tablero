@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { assigneeLabel, canEdit, formatProgress, laneVars, memberName, messageFrom, ticketKey } from '../lib/format'
+import { assigneeLabel, canEdit, formatProgress, laneVars, memberName, messageFrom, sprintSpan, ticketKey } from '../lib/format'
 import { discardTicket } from '../lib/files'
+import { CardDispatch } from '../components/CardDispatch'
 import { ActionButton, Alert, Done, Progress, TicketChips, useFeedback } from '../components/ui'
 
 const PAGE = 12
@@ -70,6 +71,8 @@ export function Board() {
   const [categories, setCategories] = useState([])
   const [links, setLinks] = useState([])
   const [members, setMembers] = useState([])
+  const [sprints, setSprints] = useState([])
+  const [planMenu, setPlanMenu] = useState(null)
   const userId = session.user.id
   const [pickedCats, setPickedCats] = useState(() => readPickedCats(userId, companyId))
   const [hiddenStatuses, setHiddenStatuses] = useState(() => readHiddenStatuses(userId, companyId))
@@ -150,17 +153,18 @@ export function Board() {
     const gen = ++loadGen.current
     const forUser = userId
     const forCompany = companyId
-    const [statusRes, ticketRes, versionRes, versionCategoryRes, categoryRes, linkRes, memberRes] = await Promise.all([
+    const [statusRes, ticketRes, versionRes, versionCategoryRes, categoryRes, linkRes, memberRes, sprintRes] = await Promise.all([
       supabase.from('statuses').select('id, name, kind, position, weight, color, allows_delete').eq('company_id', companyId).order('position'),
-      supabase.from('ticket_rows').select('id, public_number, title, status_id, progress, local_percent, priority, estimate, rank, version_id, assignee_id, parent_id').eq('company_id', companyId).order('rank'),
+      supabase.from('ticket_rows').select('id, public_number, title, status_id, progress, local_percent, priority, estimate, rank, version_id, assignee_id, sprint_id, parent_id').eq('company_id', companyId).order('rank'),
       supabase.from('versions').select('id, name, category_id').eq('company_id', companyId),
       supabase.from('version_categories').select('id, name').eq('company_id', companyId).order('name'),
       supabase.from('categories').select('id, name').eq('company_id', companyId).order('name'),
       supabase.from('ticket_categories').select('ticket_id, category_id').eq('company_id', companyId),
       supabase.from('company_members').select('user_id, alias').eq('company_id', companyId),
+      supabase.from('sprints').select('id, name, starts_on, ends_on').eq('company_id', companyId).order('starts_on'),
     ])
     if (gen !== loadGen.current) return
-    const failed = [statusRes, ticketRes, versionRes, versionCategoryRes, categoryRes, linkRes, memberRes].find((item) => item.error)
+    const failed = [statusRes, ticketRes, versionRes, versionCategoryRes, categoryRes, linkRes, memberRes, sprintRes].find((item) => item.error)
     if (failed) {
       setError(messageFrom(failed.error))
       return
@@ -172,6 +176,7 @@ export function Board() {
     setCategories(categoryRes.data ?? [])
     setLinks(linkRes.data ?? [])
     setMembers(memberRes.data ?? [])
+    setSprints(sprintRes.data ?? [])
     const known = new Set((categoryRes.data ?? []).map((item) => item.id))
     setPickedCats((current) => {
       const next = current.filter((id) => id === UNCATEGORIZED || known.has(id))
@@ -290,6 +295,7 @@ export function Board() {
 
   function startDrag(event, ticket) {
     if (busy || event.button > 0 || childrenByParent.has(ticket.id)) return
+    setPlanMenu(null)
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
     dragRef.current = { id: ticket.id, statusId: ticket.status_id, over: null }
@@ -451,6 +457,34 @@ export function Board() {
     return category ? `${category.name} ${version.name}` : version.name
   }
 
+  function sprintOf(ticket) {
+    if (!ticket.sprint_id) return ''
+    const sprint = sprints.find((item) => item.id === ticket.sprint_id)
+    if (!sprint) return ''
+    return sprintSpan(sprint) || sprint.name
+  }
+
+  function assign(ticketId, field, value) {
+    const column = { assignee: 'assignee_id', version: 'version_id', sprint: 'sprint_id' }[field]
+    if (!column) return undefined
+    const next = value || null
+    const saved = field === 'assignee' ? 'Asignación guardada.' : field === 'version' ? 'Versión guardada.' : 'Sprint guardado.'
+    return run(`plan-${ticketId}`, async () => {
+      setError('')
+      setPlanMenu(null)
+      setTickets((current) => current.map((item) => (
+        item.id === ticketId ? { ...item, [column]: next } : item
+      )))
+      const { error: updateError } = await supabase.from('tickets').update({ [column]: next }).eq('id', ticketId)
+      if (updateError) {
+        setError(messageFrom(updateError))
+        load()
+        return false
+      }
+      loadGen.current += 1
+    }, saved)
+  }
+
   function categoriesOf(ticketId) {
     const ids = links.filter((link) => link.ticket_id === ticketId).map((link) => link.category_id)
     return categories.filter((category) => ids.includes(category.id))
@@ -559,31 +593,6 @@ export function Board() {
       applyPicked((current) => current.filter((item) => item !== category.id))
       await load()
     }, 'Categoría quitada.')
-  }
-
-  function move(ticketId, statusId) {
-    return run('move', async () => {
-      setError('')
-      setTickets((current) => current.map((item) => (
-        item.id === ticketId ? { ...item, status_id: statusId } : item
-      )))
-      const { error: moveError } = await supabase.rpc('set_ticket_progress', {
-        p_ticket_id: ticketId,
-        p_status_id: statusId,
-        p_local: null,
-      })
-      if (moveError) {
-        setError(messageFrom(moveError))
-        load()
-        return false
-      }
-      const ticket = tickets.find((item) => item.id === ticketId)
-      if (ticket && ticket.status_id !== statusId) {
-        const ahead = tickets.filter((item) => item.status_id === statusId && onBoard(item) && item.rank < ticket.rank).length
-        showThrough(statusId, ahead)
-      }
-      load()
-    }, 'Ticket movido.')
   }
 
   return (
@@ -767,9 +776,7 @@ export function Board() {
                   {parentTicket && (
                     <span className="card-of">Hijo de {ticketKey(company.ticket_prefix, parentTicket.public_number)}</span>
                   )}
-                  {versionOf(ticket) && <span className="card-version">{versionOf(ticket)}</span>}
                   <p>{ticket.title}</p>
-                  <span className="card-who quiet">{assigneeLabel(assigneeById, ticket.assignee_id)}</span>
                   {categoriesOf(ticket.id).length > 0 && (
                     <span className="card-cats">
                       {categoriesOf(ticket.id).map((category) => (
@@ -780,6 +787,24 @@ export function Board() {
                   <TicketChips priority={ticket.priority} estimate={ticket.estimate} />
                   <Progress value={ticket.progress} />
                 </Link>
+                <CardDispatch
+                  editable={editable}
+                  isChild={Boolean(ticket.parent_id)}
+                  disabled={Boolean(busy)}
+                  assigneeId={ticket.assignee_id}
+                  assigneeName={ticket.assignee_id ? assigneeLabel(assigneeById, ticket.assignee_id) : ''}
+                  members={members}
+                  versionId={ticket.version_id}
+                  versionName={versionOf(ticket)}
+                  versions={versions}
+                  versionCategories={versionCategories}
+                  sprintId={ticket.sprint_id}
+                  sprintName={sprintOf(ticket)}
+                  sprints={sprints}
+                  openField={planMenu?.ticketId === ticket.id ? planMenu.field : ''}
+                  onOpen={(field) => setPlanMenu(field ? { ticketId: ticket.id, field } : null)}
+                  onChange={(field, value) => assign(ticket.id, field, value)}
+                />
                 {isParent && (
                   <div className="card-children">
                     {kids.map((child) => (
@@ -792,21 +817,6 @@ export function Board() {
                       Ver hijos
                     </button>
                   </div>
-                )}
-                {editable && !isParent && (
-                  <label className="field card-move">
-                    <span>Pasar a</span>
-                    <select
-                      value={ticket.status_id}
-                      disabled={Boolean(busy)}
-                      aria-busy={busy === 'move' || undefined}
-                      onChange={(event) => move(ticket.id, event.target.value)}
-                    >
-                      {statuses.map((option) => (
-                        <option key={option.id} value={option.id}>{option.name}</option>
-                      ))}
-                    </select>
-                  </label>
                 )}
                 {editable && !isParent && status.allows_delete && (
                   <button className="btn danger card-delete" type="button" disabled={Boolean(busy)} onClick={() => discard(ticket)}>

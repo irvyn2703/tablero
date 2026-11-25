@@ -133,25 +133,113 @@
 
 .card-key em { white-space: nowrap; }
 
-.card-version {
-  display: block;
-  margin-top: 0.2rem;
-  color: var(--brass);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
-}
-
 .card-body { display: block; }
 
-.card-who {
+.dispatch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  position: relative;
+  margin-top: 0.65rem;
+  border: 1px solid var(--line);
+}
+
+.dispatch.is-solo { grid-template-columns: minmax(0, 1fr); }
+
+.dispatch-cell {
+  min-width: 0;
+  min-height: 2.15rem;
+  padding: 0.38rem 0.45rem;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dispatch-cell + .dispatch-cell { box-shadow: inset 1px 0 0 var(--line); }
+
+.dispatch-cell.is-person { color: var(--ink); }
+
+.dispatch-cell.is-version { color: var(--brass); }
+
+.dispatch-cell.is-sprint { color: var(--pine); }
+
+.dispatch-cell.is-empty {
+  color: var(--muted);
+  font-weight: 500;
+  font-style: italic;
+}
+
+button.dispatch-cell:hover:not(:disabled),
+button.dispatch-cell.is-open {
+  background: var(--paper-deep);
+}
+
+button.dispatch-cell.is-open { box-shadow: inset 0 -2px 0 var(--brass); }
+
+.dispatch-cell + button.dispatch-cell.is-open {
+  box-shadow: inset 1px 0 0 var(--line), inset 0 -2px 0 var(--brass);
+}
+
+.dispatch-menu {
+  position: fixed;
+  z-index: 20;
+  max-height: min(16rem, 70vh);
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--brass);
+  padding: 0.15rem 0 0.3rem;
+}
+
+.dispatch-menu.is-above {
+  border-top: 1px solid var(--line);
+  border-bottom: 2px solid var(--brass);
+}
+
+.dispatch-menu input {
   display: block;
-  margin: 0.15rem 0 0.45rem;
-  font-size: 0.78rem;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
+  width: calc(100% - 0.7rem);
+  margin: 0.35rem 0.35rem 0.15rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.dispatch-menu button {
+  display: block;
+  width: 100%;
+  padding: 0.4rem 0.7rem;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-size: 0.84rem;
+  line-height: 1.3;
+}
+
+.dispatch-menu button.is-current { box-shadow: inset 3px 0 0 var(--pine); }
+
+.dispatch-menu button:hover { background: var(--paper-deep); }
+
+.dispatch-group {
+  margin: 0.45rem 0 0;
+  padding: 0.15rem 0.7rem 0.05rem;
+  color: var(--brass);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dispatch-empty {
+  margin: 0.2rem 0 0.15rem;
+  padding: 0.25rem 0.7rem 0.35rem;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .card-body p {
@@ -207,13 +295,6 @@
 .card-order .btn:hover:not(:disabled) {
   color: var(--ink);
   background: var(--paper-deep);
-}
-
-.card-move { margin-top: 0.8rem; gap: 0.28rem; }
-
-.card-move select {
-  padding: 0.42rem 0.5rem;
-  background: transparent;
 }
 
 .grip { cursor: grab; touch-action: none; }
@@ -369,6 +450,7 @@
 
 @media (max-width: 860px) {
   .card-order .btn { width: 2.5rem; height: 2.35rem; min-height: 0; }
+  .dispatch-cell { min-height: 2.5rem; }
   .board {
     grid-auto-columns: minmax(15.5rem, calc(100% - 1.75rem));
     scroll-snap-type: x mandatory;
