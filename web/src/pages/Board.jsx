@@ -53,6 +53,40 @@ function storeHiddenStatuses(userId, companyId, next) {
   }
 }
 
+function mountDragGhost(card, event) {
+  const rect = card.getBoundingClientRect()
+  const host = document.createElement('div')
+  host.className = 'card-ghost-host'
+  host.setAttribute('aria-hidden', 'true')
+  host.inert = true
+  const clone = card.cloneNode(true)
+  clone.classList.remove('is-dragging', 'is-drop-before', 'is-drop-after')
+  clone.classList.add('is-ghost')
+  clone.removeAttribute('data-ticket')
+  clone.querySelectorAll('[id]').forEach((node) => node.removeAttribute('id'))
+  const column = card.closest('.column')
+  const lane = column ? getComputedStyle(column) : null
+  if (lane) {
+    clone.style.setProperty('--lane', lane.getPropertyValue('--lane'))
+    clone.style.setProperty('--lane-ink', lane.getPropertyValue('--lane-ink'))
+  }
+  clone.style.width = `${rect.width}px`
+  const offsetX = event.clientX - rect.left
+  const offsetY = event.clientY - rect.top
+  clone.style.transform = `translate(${rect.left}px, ${rect.top}px)`
+  host.appendChild(clone)
+  document.body.appendChild(host)
+  return { host, clone, offsetX, offsetY }
+}
+
+function moveDragGhost(ghost, event) {
+  ghost.clone.style.transform = `translate(${event.clientX - ghost.offsetX}px, ${event.clientY - ghost.offsetY}px)`
+}
+
+function clearDragGhost(ghost) {
+  ghost?.host.remove()
+}
+
 export function Board() {
   const { company, role, session } = useOutletContext()
   const editable = canEdit(role)
@@ -80,6 +114,8 @@ export function Board() {
   const [query, setQuery] = useState('')
   const dragRef = useRef(null)
   const boardRef = useRef(null)
+
+  useEffect(() => () => clearDragGhost(dragRef.current?.ghost), [])
   const spots = useRef(new Map())
   const loadGen = useRef(0)
   const { busy, done, mark, run } = useFeedback()
@@ -297,8 +333,15 @@ export function Board() {
     if (busy || event.button > 0 || childrenByParent.has(ticket.id)) return
     setPlanMenu(null)
     event.preventDefault()
+    const card = event.currentTarget.closest('article')
+    if (!card) return
     event.currentTarget.setPointerCapture(event.pointerId)
-    dragRef.current = { id: ticket.id, statusId: ticket.status_id, over: null }
+    dragRef.current = {
+      id: ticket.id,
+      statusId: ticket.status_id,
+      over: null,
+      ghost: mountDragGhost(card, event),
+    }
     setDraggingId(ticket.id)
     setDrop(null)
   }
@@ -346,6 +389,7 @@ export function Board() {
   function trackDrag(event) {
     const drag = dragRef.current
     if (!drag) return
+    if (drag.ghost) moveDragGhost(drag.ghost, event)
     const next = dropTarget(event, drag)
     drag.over = next
     setDrop((current) => {
@@ -361,6 +405,7 @@ export function Board() {
   function endDrag() {
     const drag = dragRef.current
     dragRef.current = null
+    clearDragGhost(drag?.ghost)
     setDraggingId('')
     setDrop(null)
     const over = drag?.over

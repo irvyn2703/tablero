@@ -270,7 +270,24 @@ button.dispatch-cell.is-open { box-shadow: inset 2px 0 0 var(--brass); }
   text-underline-offset: 0.14em;
 }
 
-.card.is-dragging { opacity: 0.45; }
+.card.is-dragging { opacity: 0.35; }
+
+.card-ghost-host {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.card.is-ghost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+  opacity: 1;
+  box-shadow: 0 16px 36px color-mix(in srgb, var(--ink) 24%, transparent);
+}
 
 .card.is-settling { animation: card-settle 0.7s ease-out; }
 
